@@ -52,7 +52,7 @@ router.post('/register/fetchCredOptions', async (request, response) => {
  * The server calls the handleAttestation function to make all checks necessary
  * Finally we store the credential in the database 
  */
-router.post('/register/storeCredentials', async (request, response) => {
+router.post('/register/storeCredentials', (request, response) => {
 
     //if request body is empty => credential creation abandonment!
     if (Object.keys(request.body).length === 0) {
@@ -106,6 +106,7 @@ function generateAttestationRequest(username, attestationType, authenticatorType
             user: {  //userHandle, for details see https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/User_Handle.html
                 id: randomBase64URLBuffer(),  //give random id
                 name: username,
+                displayName: username
             },
     
             pubKeyCredParams: [

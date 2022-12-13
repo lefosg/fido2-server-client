@@ -32,7 +32,7 @@ app.use(expressSession({
   secret: 'keyboard cat',
   resave: false,
   saveUninitialized: true,
-  store: MongoStore.create({ mongoUrl: 'mongodb://localhost:27017/expressjs_tutorial' }),
+  store: MongoStore.create({ mongoUrl: 'mongodb://localhost:27017/fido2credentials' }),
   // Cookie Options
   cookie:{
     maxAge: 24 * 60 * 60 * 1000

@@ -5,6 +5,7 @@ var state = {
     credential: null,
     user: {
         name: "foo",  //just the default name, could be null
+        displayName: "foo"
     },
 }
 
@@ -54,14 +55,7 @@ function buffer2string(buf) {
 function setUser() {
     username = $("#email").val();
     state.user.name = username.toLowerCase().replace(/\s/g, '');
-    //state.user.displayName = username.toLowerCase();
-}
-
-function getCredentials() {
-    $.get('https://webauthn.io/credential/' + state.user.name, {}, null, 'json')
-        .done(function (response) {
-            console.log(response)
-        });
+    state.user.displayName = username.toLowerCase();
 }
 
 /**
@@ -101,7 +95,7 @@ async function makeCredential() {
         return;
     }
     
-    console.log("making a call to /webauthn/register fetch credentials options")
+    console.log("making a call to /webauthn/register/fetchCredOptions fetch credentials options")
     if ($("#email").val() === "") {
         alert("Please enter a username");
         return;
@@ -129,7 +123,7 @@ async function makeCredential() {
         /**
          * the server response looks like this: {msg: ..., status: true/false}
          * if status == false, then there was an error, and msg is a string with the message error (we alert it below)
-         * if status is not false, then the value of msg is the PublicKeyCredentialCreationOptions, for brevity we call it credentialOptions
+         * if status == true, then the value of msg is the PublicKeyCredentialCreationOptions, for brevity we call it credentialOptions
          */
         if (!jsonResp.status) {
             alert(jsonResp.msg);
@@ -137,7 +131,6 @@ async function makeCredential() {
         credentialOptions = jsonResp.msg;
         console.log(credentialOptions);
         preformatCredOptions(credentialOptions);
-        console.log(credentialOptions);
         
         if (credentialOptions.publicKey.excludeCredentials) {
             for (var i = 0; i < credentialOptions.publicKey.excludeCredentials.length; i++) {
@@ -162,13 +155,14 @@ async function makeCredential() {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({})
-            })
+            });
             state = {
                 createResponse: null,
                 publicKeyCredential: null,
                 credential: null,
                 user: {
                     name: "foo",
+                    displayName: "foo"
                 },
             }
             console.log(err)
