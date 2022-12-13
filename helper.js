@@ -1,4 +1,5 @@
 const { createHash } = require('crypto');
+const bcrypt = require('bcryptjs');
 const vanillacbor = require('vanillacbor');
 const base64url  = require('base64url');
 const cbor = require('cbor');
@@ -10,6 +11,16 @@ const cbor = require('cbor');
  */
 function hash(string) {
     return createHash('sha256').update(string).digest('hex');
+}
+
+/**
+ * Usernames are stored hashed in the database so we need to compare their hashes
+ * @param {String} given username provided at authentication 
+ * @param {String} stored username stored in database
+ * @returns true/false if username hashes match
+ */
+function validateUsername(given, stored) {
+    return bcrypt.compareSync(given, stored);
 }
 
 // ASSERTION HELPER FUNCTIONS
