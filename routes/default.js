@@ -31,11 +31,11 @@ router.get('/user/:username', async (request, response) => {
     //check if the user is registered in the database
     let usernameQueried = request.params.username;
     let userDB = await User.findOne( { username : usernameQueried } );  //here we do the search
-    console.log("A",userDB)
+    console.log("check user existence:",userDB)
     if (userDB) {
-        response.json({username: userDB.username, createdAt:userDB.createdAt});
+        response.json({username: userDB.username, createdAt:userDB.createdAt, status:true});
     } else {
-        response.json({msg:"User not found!"});
+        response.json({msg:"User not found!", status:false});
     }
 });
 

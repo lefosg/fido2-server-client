@@ -1,4 +1,5 @@
 const { createHash } = require('crypto');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const vanillacbor = require('vanillacbor');
 const base64url  = require('base64url');
@@ -22,7 +23,7 @@ function randomBase64URLBuffer(len) {
     len = len || 32;
 
     let buff = crypto.randomBytes(len);
-
+    console.log(buff);
     return base64url(buff);
 }
 
