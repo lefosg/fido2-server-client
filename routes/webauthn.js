@@ -69,27 +69,34 @@ router.post('/register/storeCredentials', async (request, response) => {
     let username = request.session.username;
     let userId = request.session.id;
 
-    let result = verifyStoreCredentialsRequest(authenticatorAttestationResponse, challenge);
-    console.log("result",result)
-    if (result.result) {
-        //Finally, store authenticator, counter, credId, pubicKey in database
-        try {
-            console.log("Storing new credentials in database..");
-            //UserSchema: userId, username, publicKey, credentialID, counter, format, createdAt->not needed to input, automatically  created
-            let pk = result['publicKey'];
-            let credId = result['credentialID']
-            let counter = result['counter'];
-            let format = result['fmt'];
-            console.log(pk)
-            await User.create({userId, username, pk, credId, counter, format});
-            console.log("!$AAAAAAAAAAAAAAAAAAAAAAAA")
-        } catch (err) {
-            console.log(err);
-            response.json({status: false});
-            return;
+    let resultP = verifyStoreCredentialsRequest(authenticatorAttestationResponse, challenge);
+
+    resultP.then(async res =>  {
+
+        if (res.result) {
+            //Finally, store authenticator, counter, credId, pubicKey in database
+            try {  //use try to check if we have a database related error
+                console.log("Storing new credentials in database..");
+                //UserSchema: userId, username, publicKey, credentialID, counter, format, createdAt->not needed to input, automatically  created
+                let pk = res.publicKey;
+                let credId = res.credentialID;
+                let counter = res.counter;
+                let format = res.fmt;
+                let newUser = await User.create({  //saves user in DB
+                    userId: userId, 
+                    username: username, 
+                    publicKey: pk.toString(), 
+                    credentialID: credId.toString(), 
+                    counter: counter, 
+                    format: format});
+            } catch (err) {
+                console.log(err);
+                response.json({status: false});
+                return;
+            }
+            response.json({status: true});
         }
-        response.json({status: true});
-    }
+    })
 });
 
 
@@ -150,104 +157,101 @@ function generateAttestationRequest(username, attestationType, authenticatorType
 
 
 async function verifyStoreCredentialsRequest(authenticatorAttestationResponse, sessionChallenge) {
-    try {
-        /*
-        inside the attestation_type_X file there is the AuthenticatorAttestationResponse
-        which has 3 core attributes:
-        One is the "id": the (1)credentialID
-        and then there is the "response" field which contains: (2)attestationObject 
-        and (3)clientDataJSON. Both are ArrayBuffers -> decode
-        */
+    
+    /*
+    inside the attestation_type_X file there is the AuthenticatorAttestationResponse
+    which has 3 core attributes:
+    One is the "id": the (1)credentialID
+    and then there is the "response" field which contains: (2)attestationObject 
+    and (3)clientDataJSON. Both are ArrayBuffers -> decode
+    */
 
-       let credentialID = authenticatorAttestationResponse.id;  //for the reference, this is the credential id
-        // ---- decoding client data json
-        let clientDataJSON = authenticatorAttestationResponse.response.clientDataJSON;
-        let clientData     = JSON.parse(base64url.decode(clientDataJSON));
-        
-        console.log("Client data JSON:");
-        console.log(clientData);    
-        
-        // ---- decoding attestation object
-        let attestationObject       = authenticatorAttestationResponse.response.attestationObject;
-        let attestationObjectBuffer = base64url.toBuffer(attestationObject);
-        let ctapMakeCredResp        = cbor.decodeAllSync(attestationObjectBuffer)[0];  //CTAP2 encodes with CBOR, so we must decode
-        
-        console.log("Client attestation object:");
-        console.log(ctapMakeCredResp);
-        
-        // ---- decoding authData
-        
-        //authData.publicKey is encoded in COSE_Key format
-        let authData = parseGetAttestAuthData(ctapMakeCredResp.authData);  //authData
-        console.log("Auth Data:");
-        console.log(authData);
-        
-        // ---- verifying the response
+    let credentialID = authenticatorAttestationResponse.id;  //for the reference, this is the credential id
+    // ---- decoding client data json
+    let clientDataJSON = authenticatorAttestationResponse.response.clientDataJSON;
+    let clientData     = JSON.parse(base64url.decode(clientDataJSON));
+    
+    console.log("Client data JSON:");
+    console.log(clientData);    
+    
+    // ---- decoding attestation object
+    let attestationObject       = authenticatorAttestationResponse.response.attestationObject;
+    let attestationObjectBuffer = base64url.toBuffer(attestationObject);
+    let ctapMakeCredResp        = cbor.decodeAllSync(attestationObjectBuffer)[0];  //CTAP2 encodes with CBOR, so we must decode
+    
+    console.log("Client attestation object:");
+    console.log(ctapMakeCredResp);
+    
+    // ---- decoding authData
+    
+    //authData.publicKey is encoded in COSE_Key format
+    let authData = parseGetAttestAuthData(ctapMakeCredResp.authData);  //authData
+    console.log("Auth Data:");
+    console.log(authData);
+    
+    // ---- verifying the response
 
-        //1. Check that origin is set to the the origin of your website. If it's not, raise phishing alarm
-        console.log("Verifying attestation response...");
-        let attestationDomainOrigin = clientData.origin;
-        if (attestationDomainOrigin != RPorigin) {
-            console.log("Domains do not match. Attestation origin says:", attestationDomainOrigin, "\nRP origin is", RPorigin);
-            return {result: false};
-        }
-        console.log("Domains match");
-        
-        //2. Check that type is set to either “webauthn.create” or “webauthn.get”. In this script we check for creation
-        let operationType = clientData.type;
-        if (operationType != operationTypes['create']) {
-            console.log("Type of attestation is '" + operationType + "'. It should be", operationTypes['create'],"or",operationTypes['get']);
-            return {result: false};
-        }
-        console.log("Type is", operationTypes['create']);
-        
-        //3. Check that challenge is set to the challenge you’ve sent
-        let attestationObjectChallenge = clientData.challenge;
-        if (attestationObjectChallenge != sessionChallenge) {
-            console.log("Challenges do not match. Got", attestationObjectChallenge, "while it was", sessionChallenge);
-            return {result: false};
-        }
-        console.log("Challenge matches");
-        
-        //4. Check that flags have UV or UP flags set
-        if (authData.flags['up'] != true || authData.flags['uv'] != true) {
-            console.log("Not flag of user presence or verification");
-            return {result: false};
-        }
-        console.log("User is present/verified");
-        
-        //5. Check the RPID hash
-        let rpIdHash = authData.rpIdHash.toString('hex');  //cast buffer to hex string
-        if (rpIdHash != ExpectedRPIDHash) {
-            console.log("RP hashes do not match. Got", rpIdHash, "expected", ExpectedRPIDHash);
-            return {result: false};
-        }
-        console.log("RPID hashes match");
-        
-        //6. Check if the authenticator added attestation data, if the RP cares about attestation
-        let verificationResult = false;
-        if (authData.flags['up'] == true) {  //probably need to verify the attestation!
-            console.log("Attestation flag is enabled. Proceeding to check attestation");
-            //check attestation format and proceed accordingly
-            let attestationFmt = ctapMakeCredResp.fmt;
-            verificationResult = handleAttestation(attestationFmt);
-            if (verificationResult == false) {
-                return {result: false};
-            }
-        }
-
-        return {
-            result: true,
-            publicKey: base64url.encode(COSEECDHAtoPKCS(authData.cosePublicKeyBuffer)),
-            credentialID: credentialID,
-            counter: authData.counter,
-            fmt: ctapMakeCredResp.fmt
-        };
-
-    } catch (err) {
-        console.log(err);
+    //1. Check that origin is set to the the origin of your website. If it's not, raise phishing alarm
+    console.log("Verifying attestation response...");
+    let attestationDomainOrigin = clientData.origin;
+    if (attestationDomainOrigin != RPorigin) {
+        console.log("Domains do not match. Attestation origin says:", attestationDomainOrigin, "\nRP origin is", RPorigin);
         return {result: false};
-    }   
+    }
+    console.log("Domains match");
+    
+    //2. Check that type is set to either “webauthn.create” or “webauthn.get”. In this script we check for creation
+    let operationType = clientData.type;
+    if (operationType != operationTypes['create']) {
+        console.log("Type of attestation is '" + operationType + "'. It should be", operationTypes['create'],"or",operationTypes['get']);
+        return {result: false};
+    }
+    console.log("Type is", operationTypes['create']);
+    
+    //3. Check that challenge is set to the challenge you’ve sent
+    let attestationObjectChallenge = clientData.challenge;
+    if (attestationObjectChallenge != sessionChallenge) {
+        console.log("Challenges do not match. Got", attestationObjectChallenge, "while it was", sessionChallenge);
+        return {result: false};
+    }
+    console.log("Challenge matches");
+    
+    //4. Check that flags have UV or UP flags set
+    if (authData.flags['up'] != true || authData.flags['uv'] != true) {
+        console.log("Not flag of user presence or verification");
+        return {result: false};
+    }
+    console.log("User is present/verified");
+    
+    //5. Check the RPID hash
+    let rpIdHash = authData.rpIdHash.toString('hex');  //cast buffer to hex string
+    if (rpIdHash != ExpectedRPIDHash) {
+        console.log("RP hashes do not match. Got", rpIdHash, "expected", ExpectedRPIDHash);
+        return {result: false};
+    }
+    console.log("RPID hashes match");
+    
+    //6. Check if the authenticator added attestation data, if the RP cares about attestation
+    let verificationResult = false;
+    if (authData.flags['up'] == true) {  //probably need to verify the attestation!
+        console.log("Attestation flag is enabled. Proceeding to check attestation");
+        //check attestation format and proceed accordingly
+        let attestationFmt = ctapMakeCredResp.fmt;
+        verificationResult = handleAttestation(attestationFmt);
+        if (verificationResult == false) {
+            return {result: false};
+        }
+    }
+
+    return {
+        result: true,
+        publicKey: base64url.encode(COSEECDHAtoPKCS(authData.cosePublicKeyBuffer)),
+        credentialID: credentialID,
+        counter: authData.counter,
+        fmt: ctapMakeCredResp.fmt
+    };
+
+    
 }
 
 /**
