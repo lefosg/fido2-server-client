@@ -14,6 +14,19 @@ function hash(string) {
 }
 
 /**
+ * Returns base64url encoded buffer of the given length
+ * @param  {Number} len - length of the buffer
+ * @return {String}     - base64url random buffer
+ */
+function randomBase64URLBuffer(len) {
+    len = len || 32;
+
+    let buff = crypto.randomBytes(len);
+
+    return base64url(buff);
+}
+
+/**
  * Usernames are stored hashed in the database so we need to compare their hashes
  * @param {String} given username provided at authentication 
  * @param {String} stored username stored in database
@@ -98,46 +111,9 @@ function parseGetAssertAuthData(buffer) {
 }
 
 
-/**
- * Handling attestation formats. Definition in the API in the link below
- * @param {string} fmt 
- * @returns true if attestation verification was successfull, else false
- * @link https://www.w3.org/TR/webauthn/#sctn-defined-attestation-formats
- */
-function handleAttestation(fmt) {
-    if (fmt == "none") {
-        console.log("Attestation format is 'none', don't check anything");
-    }
-    else if (fmt == "packed") {
-        //attestation types supported: Basic, Self, AttCA
-
-    } else if (fmt == "fido-u2f") {
-        //attestation types supported: Basic, AttCA
-
-    } else if (fmt == "tpm") {
-        //attestation types supported: Basic
-        
-    } else if (fmt == "android-key") {
-        //attestation types supported: Basic
-
-    } else if (fmt == "android-safetynet") {
-        //attestation types supported: Basic
-
-    } else if (fmt == "apple") {
-        //attestation types supported: Anonymization CA
-
-    } else {
-        console.log("Attestation type '" + fmt + "' is unknown. Cannot verify attestation");
-        return false;
-    }
-
-    return true;
-}
-
-
 module.exports ={
     hash,
+    randomBase64URLBuffer,
     parseGetAttestAuthData,
-    handleAttestation,
-    parseGetAssertAuthData
+    parseGetAssertAuthData,
 };

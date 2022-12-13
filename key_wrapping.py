@@ -1,4 +1,17 @@
-#link: https://asecuritysite.com/encryption/kek
+#[1] soruce link: <https://asecuritysite.com/encryption/kek>
+
+"""
+This file is just a demonstration of how we can handle encryption with non-resident keys.
+In non-resident keys we send the private key encrypted to the server and stores it in a database.
+
+By doing that the authenticator is released from storing in its own persistent storage and its only 
+responsibility now is to store the Key Encryption Key (KEK). The KEK is the key used to wrap (encrypt)
+the private key to be sent to the server. 
+
+This script provides two functions aes_wrap_key and aes_unwrap_key for encrypting and decrypting.
+
+All credit for this file goes to the author in the link above [1]
+"""
 
 import binascii
 import struct

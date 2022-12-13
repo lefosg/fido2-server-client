@@ -6,12 +6,16 @@ const UserSchema = new mongoose.Schema({
         required: true,
         unique: true
     },
+    id: {
+        type: mongoose.SchemaTypes.String,
+        required: true,
+        unique: true
+    },
     createdAt: {
         type: mongoose.SchemaTypes.Date,
         required: true,
         default: new Date()
     }
-
 });
 
 module.exports = mongoose.model('users', UserSchema);

@@ -4,8 +4,12 @@ const expressSession = require('express-session');
 const cookieParser  = require('cookie-parser');
 const path          = require('path');
 const crypto        = require('crypto');
-const MongoStore    = require('connect-mongo');
 
+
+/** Database
+ * We use mongo db to store public key credentials and query them based on the username(?) 
+ */
+const MongoStore    = require('connect-mongo');
 require('./database/db');
 
 //routes
@@ -15,6 +19,12 @@ const webuathnauth  = require('./routes/webauthn.js');
 const app           = express();
 const port          = 3000;
 
+/* ----- middleware ----- */
+//print type of request and url in every request
+app.use((request, response, next) => {
+  console.log(request.method, request.url);
+  next();
+});
 app.use(bodyParser.json());
 
 /* ----- session ----- */
@@ -33,6 +43,7 @@ app.use(cookieParser())
 /* ----- serve static ----- */
 app.use(express.static(path.join(__dirname, 'static')));
 
+/* ----- register routes ----- */
 app.use('/', defaultroutes)
 app.use('/webauthn', webuathnauth)
 
