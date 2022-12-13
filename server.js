@@ -7,7 +7,6 @@ const crypto        = require('crypto');
 
 //routes
 const defaultroutes = require('./routes/default');
-const passwordauth  = require('./routes/password');
 const webuathnauth  = require('./routes/webauthn.js');
 
 const app           = express();
@@ -28,9 +27,7 @@ app.use(cookieParser())
 app.use(express.static(path.join(__dirname, 'static')));
 
 app.use('/', defaultroutes)
-app.use('/password', passwordauth)
 app.use('/webauthn', webuathnauth)
 
 app.listen(port);
 console.log(`Started app on port localhost:`+port);
-

@@ -4,21 +4,18 @@ const fs = require('fs');
 const {hash, parseGetAttestAuthData, handleAttestation} = require('./helper.js')
 const {RPorigin, operationTypes, RPchallenge, ExpectedRPIDHash} = require('./constants.js')
 
-
 console.log();
 
 try {
 
     /*
-    inside the attestation file there are 3 main attributes:
+    inside the attestation_type_X file there is the AuthenticatorAttestationResponse
+    which has 3 core attributes:
     One is the "id": the (1)credentialID
-    Second is the "response": contains (2)attestationObject and (3)clientDataJSON. Both are ArrayBuffers
-    
+    and then there is the "response" field which contains: (2)attestationObject 
+    and (3)clientDataJSON. Both are ArrayBuffers -> decode
     */
-    const attestationFile = fs.readFileSync("./attestation_creds/attestation_type_none.json");
-
-    let credentialID = JSON.parse(attestationFile).id;  //for the reference, this is the credential id
-    //console.log(credentialID);
+    const attestationFile = fs.readFileSync("./attestation_creds/attestation_type_none.json");  //load the attestation object here
     
     // ---- decoding client data json
     let clientDataJSON = JSON.parse(attestationFile).response.clientDataJSON;
