@@ -4,8 +4,7 @@ var state = {
     publicKeyCredential: null,
     credential: null,
     user: {
-        name: "foo",
-        displayName: "foo",
+        name: "foo",  //just the default name, could be null
     },
 }
 
@@ -55,7 +54,7 @@ function buffer2string(buf) {
 function setUser() {
     username = $("#email").val();
     state.user.name = username.toLowerCase().replace(/\s/g, '');
-    state.user.displayName = username.toLowerCase();
+    //state.user.displayName = username.toLowerCase();
 }
 
 function getCredentials() {
@@ -94,6 +93,7 @@ async function checkUserExists() {
 
 
 async function makeCredential() {
+    //TODO: make login-button inactive while registering
     let userExists = await checkUserExists();
     
     if (userExists) {
@@ -112,7 +112,7 @@ async function makeCredential() {
     var attestation_type = $('#select-attestation').find(':selected').val();
     var authenticator_attachment = $('#select-authenticator').find(':selected').val();
 
-    fetch('http://localhost:3000/webauthn/register', {
+    fetch('http://localhost:3000/webauthn/register/fetchCredOptions', {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
@@ -145,48 +145,50 @@ async function makeCredential() {
             }
         }
 
-        //create the credential -> CTAP2 kicks in here
+        //create the credential -> CTAP2 kicks in here, a popup appears asking to connect the authenticator and create the key pair
         navigator.credentials.create({  
             publicKey: credentialOptions
         }).then(function (newCredential) {
             console.log("PublicKeyCredential Created");
-            console.log(newCredential);
+            console.log(newCredential);  //this is a JSON object so it is 100% ready to be sent back to the server endpoint 'webauthn/register/storeCredential'
             state.createResponse = newCredential;
-            //registerNewCredential(newCredential);  //send it back to the server (actually sends the attestation)
-        }).catch(function (err) {console.log(err)});
+            //registerNewCredential(newCredential);  
+        }).catch(function (err) { 
+            //SOS, on credential creation abandonment, update the server to clear its session variables, and for the frontend reset the state variable (see top of the file) 
+            fetch('http://localhost:3000/webauthn/register/storeCredentials', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            })
+            state = {
+                createResponse: null,
+                publicKeyCredential: null,
+                credential: null,
+                user: {
+                    name: "foo",
+                },
+            }
+            console.log(err)
+        });
     })
     .catch(error => console.log(error));
 
-    // $.get('http://localhost:3000/register/' + state.user.name, {
-    //         attType: attestation_type,
-    //         authType: authenticator_attachment
-    //     }, null, 'json')
-    //     .done(function (makeCredentialOptions) {  //received parameters from the RP that setup the credentials registration/attestation
-    //         makeCredentialOptions.publicKey.challenge = bufferDecode(makeCredentialOptions.publicKey.challenge);
-    //         makeCredentialOptions.publicKey.user.id = bufferDecode(makeCredentialOptions.publicKey.user.id);
-    //         if (makeCredentialOptions.publicKey.excludeCredentials) {
-    //             for (var i = 0; i < makeCredentialOptions.publicKey.excludeCredentials.length; i++) {
-    //                 makeCredentialOptions.publicKey.excludeCredentials[i].id = bufferDecode(makeCredentialOptions.publicKey.excludeCredentials[i].id);
-    //             }
-    //         }
-    //         navigator.credentials.create({  //create the credential
-    //             publicKey: makeCredentialOptions.publicKey
-    //         }).then(function (newCredential) {
-    //             console.log("PublicKeyCredential Created");
-    //             console.log(newCredential);
-    //             state.createResponse = newCredential;
-    //             registerNewCredential(newCredential);  //send it back to the server (actually sends the attestation)
-    //         }).catch(function (err) {console.log(err)});
-    //     });
 }
 
-// This should be used to verify the auth data with the server
+/**
+ * This method is called after the public key credential is created.
+ * We send the AuthenticatorAttestationResponse but wait to get a status response back
+ * to make sure the server successfully saved the credential
+ * @param {PublicKeyCredential} newCredential the AuthenticatorAttestationResponse
+ */
 function registerNewCredential(newCredential) {
     // Move data into Arrays incase it is super long
     let attestationObject = new Uint8Array(newCredential.response.attestationObject);
     let clientDataJSON = new Uint8Array(newCredential.response.clientDataJSON);
     let rawId = new Uint8Array(newCredential.rawId);
-
 
     $.ajax({
         url: 'https://webauthn.io/makeCredential',
@@ -207,6 +209,9 @@ function registerNewCredential(newCredential) {
             alert("Successful credential creation and sending to the RP");
         }
     });
+
+    let statusResponse = fetch()
+
 }
 
 
@@ -276,11 +281,6 @@ function verifyAssertion(assertedCredential) {
             console.log(response)
         }
     });
-}
-
-function setCurrentUser(userResponse) {
-    state.user.name = userResponse.name;
-    state.user.displayName = userResponse.display_name;
 }
 
 

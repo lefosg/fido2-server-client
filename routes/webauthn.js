@@ -8,6 +8,7 @@ const User = require('../database/schemas/User');
 
 //RP data/local variables, could have a database containing them
 const RPorigin = "http://localhost";
+const rpEffectiveDomain = "localhost";
 const operationTypes = {
     'create' : 'webauthn.create',
     'get' : 'webauthn.get'
@@ -22,7 +23,7 @@ const router = Router();
  * PublicKeyCredentialCreationOptions object (this is the variable that reaches the client) 
  * Note: we save all information related to the client with express sessions
  */
-router.post('/register', async (request, response) => {
+router.post('/register/fetchCredOptions', async (request, response) => {
     let {username, attestationType, authenticatorType} = request.body;
 
     //check if parameters were given
@@ -42,7 +43,7 @@ router.post('/register', async (request, response) => {
     request.session.challenge = PublicKeyCredentialCreationOptions.challenge;
     request.session.username = username;
     request.session.id = PublicKeyCredentialCreationOptions.user.id;
-    console.log(PublicKeyCredentialCreationOptions);
+    //console.log(PublicKeyCredentialCreationOptions);
     response.json({msg: PublicKeyCredentialCreationOptions, status:true});
 });
 
@@ -52,9 +53,19 @@ router.post('/register', async (request, response) => {
  * Finally we store the credential in the database 
  */
 router.post('/register/storeCredentials', async (request, response) => {
-    //get user specific info with request.session.varname
+
+    //if request body is empty => credential creation abandonment!
+    if (Object.keys(request.body).length === 0) {
+        console.log("Abandoned key creation at client side, clearing sessions variables");
+        request.session.challenge = "";
+        request.session.username = "";
+        request.session.id = "";
+        return;
+    }
     
-    let authenticatorAttestationResponse = request.body;
+    //else, the client sent back an authenticator response, so we have to check it
+    let { authenticatorAttestationResponse } = request.body;
+    
     let challenge = request.session.challenge;
     let result = verifyStoreCredentialsRequest(authenticatorAttestationResponse, challenge);
     if (result) {
@@ -89,13 +100,12 @@ function generateAttestationRequest(username, attestationType, authenticatorType
              */
             rp: {
                 name: "localhost",
-                id: "localhost"  
+                id: rpEffectiveDomain  
             },
     
             user: {  //userHandle, for details see https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/User_Handle.html
                 id: randomBase64URLBuffer(),  //give random id
                 name: username,
-                displayName: username
             },
     
             pubKeyCredParams: [
@@ -111,7 +121,7 @@ function generateAttestationRequest(username, attestationType, authenticatorType
                 attestation: attestationType,  
                 authenticatorSelection: {
                     authenticatorAttachment: authenticatorType,  //can use any authenticator - platform/roaming, again for this example let the user decide
-                    requireResidentKey: false,  //decide if resident keys will be used or not! Values: true/false. More on resident keys: https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/Resident_Keys.html
+                    requireResidentKey: true,  //decide if resident keys will be used or not! Values: true/false. More on resident keys: https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/Resident_Keys.html
                     userVerification: "preferred"  //values: "preferred", "discouraged", "required", more: https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/User_Presence_vs_User_Verification.html
                 },
                 excludeCredentials: [],  //limit the creation of multiple credentials
