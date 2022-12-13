@@ -89,12 +89,11 @@ router.post('/register/storeCredentials', async (request, response) => {
                     credentialID: credId.toString(), 
                     counter: counter, 
                     format: format});
+                    response.json({status: true});
             } catch (err) {
                 console.log(err);
                 response.json({status: false});
-                return;
             }
-            response.json({status: true});
         }
     })
 });

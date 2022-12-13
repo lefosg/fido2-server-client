@@ -89,12 +89,13 @@ async function checkUserExists() {
 async function makeCredential() {
     //TODO: make login-button inactive while registering
     let userExists = await checkUserExists();
+    $('#login-button').attr("disabled", true);
     
     if (userExists) {
         alert("User exists, try another name");
+        $('#login-button').attr("disabled", false);
         return;
     }
-    
     console.log("making a call to /webauthn/register/fetchCredOptions fetch credentials options")
     if ($("#email").val() === "") {
         alert("Please enter a username");
@@ -164,7 +165,8 @@ async function makeCredential() {
                     name: "foo",
                     displayName: "foo"
                 },
-            }
+            };
+            $('#login-button').attr("disabled", false);
             console.log(err)
         });
     })
@@ -178,9 +180,9 @@ async function makeCredential() {
  * to make sure the server successfully saved the credential
  * @param {PublicKeyCredential} newCredential the AuthenticatorAttestationResponse
  */
-function sendAuthenticatorAttestationResponse(newCredential) {
+async function sendAuthenticatorAttestationResponse(newCredential) {
 
-    let statusResponse = fetch('http://localhost:3000/webauthn/register/storeCredentials', {
+    let statusResponse = await fetch('http://localhost:3000/webauthn/register/storeCredentials', {
         method: 'POST',
         headers: {
             'Accept': 'application/json',
@@ -198,44 +200,56 @@ function sendAuthenticatorAttestationResponse(newCredential) {
         })
     });
 
+    let status = await statusResponse.json();
+    if (status.status) {
+        $('#login-button').attr("disabled", false);
+    }
 }
 
 
-function getAssertion() {
+async function getAssertion() {
     if ($("#email").val() === "") {
         alert("Please enter a username");
         return;
     }
     setUser();
-    $.get('/user/' + state.user.name + '/exists', {}, null, 'json').done(function (response) {
-            console.log(response);
-        }).then(function () {
-            $.get('https://webauthn.io/assertion/' + state.user.name, {}, null, 'json')
-                .done(function (makeAssertionOptions) {
-                    makeAssertionOptions.publicKey.challenge = bufferDecode(makeAssertionOptions.publicKey.challenge);
-                    makeAssertionOptions.publicKey.allowCredentials.forEach(function (listItem) {
-                        listItem.id = bufferDecode(listItem.id)
-                    });
-                    console.log("Assertion options received from the RP");
-                    console.log(makeAssertionOptions);
-                    navigator.credentials.get({
-                            publicKey: makeAssertionOptions.publicKey
-                        })
-                        .then(function (credential) {
-                            console.log(credential);
-                            verifyAssertion(credential);  //send assertion back to the RP
-                        }).catch(function (err) {
-                            console.log(err.name);
-                            alert(err.message);
-                        });
-                });
-        })
-        .catch(function (error) {
-            if (!error.exists) {
-                alert("User not found, try registering one first!");
-            }
-            return;
-        });
+    let userExists = await checkUserExists();
+    $('#register-button').attr("disabled", true);
+    
+    if (!userExists) {
+        alert("User does not exist, try registering first");
+        $('#register-button').attr("disabled", false);
+        return;
+    }
+    // $.get('/user/' + state.user.name + '/exists', {}, null, 'json').done(function (response) {
+    //         console.log(response);
+    //     }).then(function () {
+    //         $.get('https://webauthn.io/assertion/' + state.user.name, {}, null, 'json')
+    //             .done(function (makeAssertionOptions) {
+    //                 makeAssertionOptions.publicKey.challenge = bufferDecode(makeAssertionOptions.publicKey.challenge);
+    //                 makeAssertionOptions.publicKey.allowCredentials.forEach(function (listItem) {
+    //                     listItem.id = bufferDecode(listItem.id)
+    //                 });
+    //                 console.log("Assertion options received from the RP");
+    //                 console.log(makeAssertionOptions);
+    //                 navigator.credentials.get({
+    //                         publicKey: makeAssertionOptions.publicKey
+    //                     })
+    //                     .then(function (credential) {
+    //                         console.log(credential);
+    //                         verifyAssertion(credential);  //send assertion back to the RP
+    //                     }).catch(function (err) {
+    //                         console.log(err.name);
+    //                         alert(err.message);
+    //                     });
+    //             });
+    //     })
+    //     .catch(function (error) {
+    //         if (!error.exists) {
+    //             alert("User not found, try registering one first!");
+    //         }
+    //         return;
+    //     });
 }
 
 function verifyAssertion(assertedCredential) {
