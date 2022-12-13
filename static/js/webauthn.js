@@ -145,7 +145,7 @@ async function makeCredential() {
             console.log("PublicKeyCredential Created");
             console.log(newCredential);  //this is a JSON object so it is 100% ready to be sent back to the server endpoint 'webauthn/register/storeCredential'
             state.createResponse = newCredential;
-            //registerNewCredential(newCredential);  
+            sendAuthenticatorAttestationResponse(newCredential);  
         }).catch(function (err) { 
             //SOS, on credential creation abandonment, update the server to clear its session variables, and for the frontend reset the state variable (see top of the file) 
             fetch('http://localhost:3000/webauthn/register/storeCredentials', {
@@ -178,33 +178,25 @@ async function makeCredential() {
  * to make sure the server successfully saved the credential
  * @param {PublicKeyCredential} newCredential the AuthenticatorAttestationResponse
  */
-function registerNewCredential(newCredential) {
-    // Move data into Arrays incase it is super long
-    let attestationObject = new Uint8Array(newCredential.response.attestationObject);
-    let clientDataJSON = new Uint8Array(newCredential.response.clientDataJSON);
-    let rawId = new Uint8Array(newCredential.rawId);
+function sendAuthenticatorAttestationResponse(newCredential) {
 
-    $.ajax({
-        url: 'https://webauthn.io/makeCredential',
-        type: 'POST',
-        data: JSON.stringify({
+    let statusResponse = fetch('http://localhost:3000/webauthn/register/storeCredentials', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        //because navigator.credentials.create returns ArrayBuffer, encode them to base64 url, and decode on server
+        body: JSON.stringify({
             id: newCredential.id,
-            rawId: bufferEncode(rawId),
-            type: newCredential.type,
+            rawId: window.base64url['encode'](newCredential.rawId),
             response: {
-                attestationObject: bufferEncode(attestationObject),
-                clientDataJSON: bufferEncode(clientDataJSON),
+                clientDataJSON: window.base64url['encode'](newCredential.response.clientDataJSON),
+                attestationObject: window.base64url['encode'](newCredential.response.attestationObject)
             },
-        }),
-        contentType: "application/json; charset=utf-8",
-        dataType: "json",
-        success: function (response) {
-            console.log("response from sending attestation:",response);
-            alert("Successful credential creation and sending to the RP");
-        }
+            type: newCredential.type
+        })
     });
-
-    let statusResponse = fetch()
 
 }
 

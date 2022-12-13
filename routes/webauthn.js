@@ -2,12 +2,12 @@ const { Router } = require('express');
 const base64url  = require('base64url');
 const cbor = require('cbor');
 const fs = require('fs');
-const {hash, randomBase64URLBuffer, parseGetAttestAuthData} = require('../helper.js')
+const {hash, COSEECDHAtoPKCS, randomBase64URLBuffer, parseGetAttestAuthData} = require('../helper.js')
 const User = require('../database/schemas/User');
 
 
 //RP data/local variables, could have a database containing them
-const RPorigin = "http://localhost";
+const RPorigin = "http://localhost:3000";
 const rpEffectiveDomain = "localhost";
 const operationTypes = {
     'create' : 'webauthn.create',
@@ -52,7 +52,7 @@ router.post('/register/fetchCredOptions', async (request, response) => {
  * The server calls the handleAttestation function to make all checks necessary
  * Finally we store the credential in the database 
  */
-router.post('/register/storeCredentials', (request, response) => {
+router.post('/register/storeCredentials', async (request, response) => {
 
     //if request body is empty => credential creation abandonment!
     if (Object.keys(request.body).length === 0) {
@@ -64,14 +64,31 @@ router.post('/register/storeCredentials', (request, response) => {
     }
     
     //else, the client sent back an authenticator response, so we have to check it
-    let { authenticatorAttestationResponse } = request.body;
-    
+    let authenticatorAttestationResponse = request.body;
     let challenge = request.session.challenge;
+    let username = request.session.username;
+    let userId = request.session.id;
+
     let result = verifyStoreCredentialsRequest(authenticatorAttestationResponse, challenge);
-    if (result) {
-        response.send('stored credentials successfully')
-    } else {
-        response.send('could not store credentials')
+    console.log("result",result)
+    if (result.result) {
+        //Finally, store authenticator, counter, credId, pubicKey in database
+        try {
+            console.log("Storing new credentials in database..");
+            //UserSchema: userId, username, publicKey, credentialID, counter, format, createdAt->not needed to input, automatically  created
+            let pk = result['publicKey'];
+            let credId = result['credentialID']
+            let counter = result['counter'];
+            let format = result['fmt'];
+            console.log(pk)
+            await User.create({userId, username, pk, credId, counter, format});
+            console.log("!$AAAAAAAAAAAAAAAAAAAAAAAA")
+        } catch (err) {
+            console.log(err);
+            response.json({status: false});
+            return;
+        }
+        response.json({status: true});
     }
 });
 
@@ -133,9 +150,7 @@ function generateAttestationRequest(username, attestationType, authenticatorType
 
 
 async function verifyStoreCredentialsRequest(authenticatorAttestationResponse, sessionChallenge) {
-
     try {
-        
         /*
         inside the attestation_type_X file there is the AuthenticatorAttestationResponse
         which has 3 core attributes:
@@ -143,25 +158,19 @@ async function verifyStoreCredentialsRequest(authenticatorAttestationResponse, s
         and then there is the "response" field which contains: (2)attestationObject 
         and (3)clientDataJSON. Both are ArrayBuffers -> decode
         */
-        const attestationFile = fs.readFileSync("./attestation_creds/attestation_type_none.json");  //TODO: replace with incoming object from client
-        //const attestationResponse = authenticatorAttestationResponse;
+
+       let credentialID = authenticatorAttestationResponse.id;  //for the reference, this is the credential id
         // ---- decoding client data json
-        let clientDataJSON = JSON.parse(attestationFile).response.clientDataJSON;
+        let clientDataJSON = authenticatorAttestationResponse.response.clientDataJSON;
         let clientData     = JSON.parse(base64url.decode(clientDataJSON));
         
-        let credentialID = JSON.parse(attestationFile).id;  //for the reference, this is the credential id
-        console.log("Credential ID:");
-        console.log(credentialID);
-        console.log("Credential ID store in session:");
-        console.log(id);
-
         console.log("Client data JSON:");
-        console.log((clientData));    
+        console.log(clientData);    
         
         // ---- decoding attestation object
-        let attestationObject       = JSON.parse(attestationFile).response.attestationObject;
+        let attestationObject       = authenticatorAttestationResponse.response.attestationObject;
         let attestationObjectBuffer = base64url.toBuffer(attestationObject);
-        let ctapMakeCredResp        = cbor.decodeAllSync(attestationObjectBuffer)[0];
+        let ctapMakeCredResp        = cbor.decodeAllSync(attestationObjectBuffer)[0];  //CTAP2 encodes with CBOR, so we must decode
         
         console.log("Client attestation object:");
         console.log(ctapMakeCredResp);
@@ -169,9 +178,9 @@ async function verifyStoreCredentialsRequest(authenticatorAttestationResponse, s
         // ---- decoding authData
         
         //authData.publicKey is encoded in COSE_Key format
-        let userInformation = parseGetAttestAuthData(ctapMakeCredResp.authData);  //authData
-        console.log("User Data (authData - authenticator data):");
-        console.log(userInformation);
+        let authData = parseGetAttestAuthData(ctapMakeCredResp.authData);  //authData
+        console.log("Auth Data:");
+        console.log(authData);
         
         // ---- verifying the response
 
@@ -180,7 +189,7 @@ async function verifyStoreCredentialsRequest(authenticatorAttestationResponse, s
         let attestationDomainOrigin = clientData.origin;
         if (attestationDomainOrigin != RPorigin) {
             console.log("Domains do not match. Attestation origin says:", attestationDomainOrigin, "\nRP origin is", RPorigin);
-            return false;
+            return {result: false};
         }
         console.log("Domains match");
         
@@ -188,7 +197,7 @@ async function verifyStoreCredentialsRequest(authenticatorAttestationResponse, s
         let operationType = clientData.type;
         if (operationType != operationTypes['create']) {
             console.log("Type of attestation is '" + operationType + "'. It should be", operationTypes['create'],"or",operationTypes['get']);
-            return false;
+            return {result: false};
         }
         console.log("Type is", operationTypes['create']);
         
@@ -196,47 +205,48 @@ async function verifyStoreCredentialsRequest(authenticatorAttestationResponse, s
         let attestationObjectChallenge = clientData.challenge;
         if (attestationObjectChallenge != sessionChallenge) {
             console.log("Challenges do not match. Got", attestationObjectChallenge, "while it was", sessionChallenge);
-            return false;
+            return {result: false};
         }
         console.log("Challenge matches");
         
         //4. Check that flags have UV or UP flags set
-        if (userInformation.flags['up'] != true || userInformation.flags['uv'] != true) {
+        if (authData.flags['up'] != true || authData.flags['uv'] != true) {
             console.log("Not flag of user presence or verification");
-            return false;
+            return {result: false};
         }
         console.log("User is present/verified");
         
         //5. Check the RPID hash
-        let rpIdHash = userInformation.rpIdHash.toString('hex');  //cast buffer to hex string
+        let rpIdHash = authData.rpIdHash.toString('hex');  //cast buffer to hex string
         if (rpIdHash != ExpectedRPIDHash) {
             console.log("RP hashes do not match. Got", rpIdHash, "expected", ExpectedRPIDHash);
-            return false;
+            return {result: false};
         }
         console.log("RPID hashes match");
         
         //6. Check if the authenticator added attestation data, if the RP cares about attestation
         let verificationResult = false;
-        if (userInformation.flags['up'] == true) {  //probably need to verify the attestation!
+        if (authData.flags['up'] == true) {  //probably need to verify the attestation!
             console.log("Attestation flag is enabled. Proceeding to check attestation");
             //check attestation format and proceed accordingly
             let attestationFmt = ctapMakeCredResp.fmt;
             verificationResult = handleAttestation(attestationFmt);
             if (verificationResult == false) {
-                return false;
+                return {result: false};
             }
         }
-        
-        //7. Finally store authenticator, counter, credId, pubicKey in a database
-        if (verificationResult) {
-            console.log("Storing new credentials in database..");
-            await User.create({ username, credentialID });
-        }
-        return true;
+
+        return {
+            result: true,
+            publicKey: base64url.encode(COSEECDHAtoPKCS(authData.cosePublicKeyBuffer)),
+            credentialID: credentialID,
+            counter: authData.counter,
+            fmt: ctapMakeCredResp.fmt
+        };
 
     } catch (err) {
         console.log(err);
-        return false;
+        return {result: false};
     }   
 }
 

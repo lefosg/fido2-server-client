@@ -21,14 +21,12 @@ function hash(string) {
  */
 function randomBase64URLBuffer(len) {
     len = len || 32;
-
     let buff = crypto.randomBytes(len);
-    console.log(buff);
     return base64url(buff);
 }
 
 /**
- * Usernames are stored hashed in the database so we need to compare their hashes
+ * Usernames may be stored hashed in the database so we need to compare their hashes
  * @param {String} given username provided at authentication 
  * @param {String} stored username stored in database
  * @returns true/false if username hashes match
@@ -111,9 +109,40 @@ function parseGetAssertAuthData(buffer) {
     return {rpIdHash, counter, flags, counterBuffer, aaguid, credIdBuffer, cosePublicKeyBuffer, coseExtensionsDataBuffer}
 }
 
+/**
+ * Takes COSE encoded public key and converts it to RAW PKCS ECDHA key
+ * @param  {Buffer} COSEPublicKey - COSE encoded public key
+ * @return {Buffer}               - RAW PKCS encoded public key
+ */
+function COSEECDHAtoPKCS(COSEPublicKey) {
+    /* 
+       +------+-------+-------+---------+----------------------------------+
+       | name | key   | label | type    | description                      |
+       |      | type  |       |         |                                  |
+       +------+-------+-------+---------+----------------------------------+
+       | crv  | 2     | -1    | int /   | EC Curve identifier - Taken from |
+       |      |       |       | tstr    | the COSE Curves registry         |
+       |      |       |       |         |                                  |
+       | x    | 2     | -2    | bstr    | X Coordinate                     |
+       |      |       |       |         |                                  |
+       | y    | 2     | -3    | bstr /  | Y Coordinate                     |
+       |      |       |       | bool    |                                  |
+       |      |       |       |         |                                  |
+       | d    | 2     | -4    | bstr    | Private key                      |
+       +------+-------+-------+---------+----------------------------------+
+    */
+
+    //let coseStruct = cbor.decodeAllSync(cbor.encode(COSEPublicKey))[0];
+    //console.log(coseStruct)
+    let tag = Buffer.from([0x04]);
+    let x   = COSEPublicKey[0][-2];
+    let y   = COSEPublicKey[0][-3];
+    return Buffer.concat([tag, x, y])
+}
 
 module.exports ={
     hash,
+    COSEECDHAtoPKCS,
     randomBase64URLBuffer,
     parseGetAttestAuthData,
     parseGetAssertAuthData,
