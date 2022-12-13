@@ -2,7 +2,7 @@ const { Router } = require('express');
 const base64url  = require('base64url');
 const cbor = require('cbor');
 const fs = require('fs');
-const {hash, parseGetAttestAuthData} = require('./helper.js')
+const {hash, parseGetAttestAuthData} = require('../helper.js')
 
 
 //RP data/local variables, could have a database containing them
@@ -142,3 +142,5 @@ function handleAssertion() {
     }
     
 }
+
+module.exports = router;

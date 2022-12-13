@@ -1,25 +1,29 @@
 const express       = require('express');
 const bodyParser    = require('body-parser');
-const cookieSession = require('cookie-session');
+const expressSession = require('express-session');
 const cookieParser  = require('cookie-parser');
 const path          = require('path');
 const crypto        = require('crypto');
 
 //routes
-const defaultroutes = require('./routes/default');
+const defaultroutes = require('./routes/default.js');
 const webuathnauth  = require('./routes/webauthn.js');
 
 const app           = express();
+const port          = 3000;
 
 app.use(bodyParser.json());
 
 /* ----- session ----- */
-app.use(cookieSession({
-  name: 'session',
-  keys: [crypto.randomBytes(32).toString('hex')],
+app.use(expressSession({
+  secret: 'keyboard cat',
+  resave: false,
+  saveUninitialized: true,
 
   // Cookie Options
-  maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  cookie:{
+    maxAge: 24 * 60 * 60 * 1000
+  } // 24 hours
 }))
 app.use(cookieParser())
 
@@ -30,4 +34,4 @@ app.use('/', defaultroutes)
 app.use('/webauthn', webuathnauth)
 
 app.listen(port);
-console.log(`Started app on port localhost:`+port);
+console.log(`Started app on http://localhost:`+port);
