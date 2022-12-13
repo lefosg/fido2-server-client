@@ -1,0 +1,12 @@
+{
+    "rawId": "Aad50Szy7ZFb8f7wdfMmFO2dUdQB8StMrYBbhJprTCJIKVdbIiMs9dAATKOvUpoKfmyh662ZsO1J5PQUsi9yKNumDR-ZD4wevDYZnwprytGf5rn6ydyxQQtBYPSwS8u23FdVBxBqHa8",
+    "id": "Aad50Szy7ZFb8f7wdfMmFO2dUdQB8StMrYBbhJprTCJIKVdbIiMs9dAATKOvUpoKfmyh662ZsO1J5PQUsi9yKNumDR-ZD4wevDYZnwprytGf5rn6ydyxQQtBYPSwS8u23FdVBxBqHa8",
+    "response": {
+        "authenticatorData": "zHUM-fXe8fPTc7IQdAU8xhonRmZeDznRqJqecdVRcUMFYfOzqg",
+        "signature": "MEUCIHxzf1KZNJTb831gqw0oit-6ms8DoSXLaM8zyZ4Q6iyjAiEAwbguOZU2iJae_I8-Q7qlFwR45isZ-XYVMDgU2SkABU8",
+        "userHandle": "Kosv9fPtkDoh4Oz7Yq_pVgWHS8HhdlCto5cR0aBoVMw",
+        "clientDataJSON": "eyJ0eXBlIjoid2ViYXV0aG4uZ2V0IiwiY2hhbGxlbmdlIjoiRjVjSmhMRW00OFNpdGN6MzNiVm51NXpBMmEtRk5MYkxGbURfd1UwT1BIUSIsIm9yaWdpbiI6Imh0dHBzOi8vd2ViYXV0aG53b3Jrcy5naXRodWIuaW8iLCJjcm9zc09yaWdpbiI6ZmFsc2V9"
+    },
+    "getClientExtensionResults": {},
+    "type": "public-key"
+}
