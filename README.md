@@ -9,13 +9,13 @@ This project was heavily influenced by the FIDO Alliance WebAuthn demo https://g
 For this implementation we use the expressjs framework for the server. Storage of public key credential material is done with the help of MongoDB.
 
 ## WebAuthn Registration
-This is an overview of the calls in the code during registration <br>
+This is an overview of the calls (HTTP requests) in the code during registration <br>
 <img src="./sources/webauthn_registration.svg"> <br>
 
 The user navigates to the registration/login form enters a name and clicks register. Note that in our scenario, for demonstration purposes, we allow the user to change attestation type and authenticator attachment.
 
-Upon clicking register a call will be made to the endopoint 'http://localhost:3000/user/:username', where ':username' is the username the user gave as input in the form. If the user does not exist (aka status == false), registration is feasible so we proceed.
-After that we make a call to 'http://localhost:3000/webauthn/register/fetchCredOptions' asking for the **PublicKeyCredentialOptions**. We must refer to the Relying Party for that because **the Relying Party sets these parameters**. Below we have some sample **PublicKeyCredentialOptions** objects, one from Yubico's website, and one from DuoLabs's.
+Upon clicking register a GET request will be made to the endopoint 'http://localhost:3000/user/:username', where ':username' is the username the user gave as input in the form. If the user does not exist (aka status == false), registration is feasible so we proceed.
+After that we make a POST request to 'http://localhost:3000/webauthn/register/fetchCredOptions' asking for the **PublicKeyCredentialOptions**. We must refer to the Relying Party for that because **the Relying Party sets these parameters**. Below we have some sample **PublicKeyCredentialOptions** objects, one from Yubico's website, and one from DuoLabs's.
 
 ```js
 //The Yubiko sample object is shows strings in Base64 form for readability
@@ -97,6 +97,6 @@ The result of the `console.log(PK)` should look like that:
 }
 ```
 
-Next step is to send the PK created above back to the server for validation. We make a call to 'http://localhost:3000/webauthn/register/storeCredentials', where the server gets the **PublicKeyCredential** and runs **verifyStoreCredentialsRequest** on it.
+Next step is to send the PK created above back to the server for validation. We make a POST request to 'http://localhost:3000/webauthn/register/storeCredentials', where the server gets the **PublicKeyCredential** and runs **verifyStoreCredentialsRequest** on it.
 
 Finally the server responds with a status code of true/false to flag the successful storage of the public key credential in the database
