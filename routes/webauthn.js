@@ -78,7 +78,7 @@ router.post('/register/storeCredentials', async (request, response) => {
         if (res.result) {
             //Finally, store authenticator, counter, credId, pubicKey in database
             try {  //use try to check if we have a database related error
-                console.log("Storing new credentials in database..");
+                console.log("Storing new credential in database..");
                 //UserSchema: userId, username, publicKey, credentialID, counter, createdAt->not needed to input, automatically  created
                 let pk = res.publicKey;
                 let credId = res.credentialID;
@@ -97,6 +97,8 @@ router.post('/register/storeCredentials', async (request, response) => {
                 request.session.UserId = undefined;   
 
                 response.json({status: true});
+                console.log("Successfully stored credential in database..");
+                
             } catch (err) {
                 console.log(err);
                 response.json({status: false});
@@ -105,7 +107,50 @@ router.post('/register/storeCredentials', async (request, response) => {
     })
 });
 
+router.post('/login/fetchAssertionOptions', async (request, response) => {
+    
+    let { username } = request.body;
+    if (!username) {
+        response.json({status:false, msg: "No username inputted"});
+        return;
+    }
 
+    //check that the user exists in database
+    let userInfo = (await User.find({username: username}))[0];
+    if (!userInfo) { 
+        response.json({status: false, msg: "User does not exist for authentication"});
+    } else {
+        let PublicKeyCredentialRequestOptions = generateAssertionRequest(userInfo.credentialID);
+        request.session.challenge = PublicKeyCredentialRequestOptions.challenge;
+        request.session.credId = userInfo.credentialID;
+        response.json({status: true, msg: PublicKeyCredentialRequestOptions});
+    }
+});
+
+router.post('/login/verifyAssertion', (request, response) => {
+    //if request body is empty => credential creation abandonment!
+    let authenticatorAssertionResponse = request.body;
+    if ( !authenticatorAssertionResponse.id ||
+         !authenticatorAssertionResponse.rawId ||
+         !authenticatorAssertionResponse.response.authenticatorData ||
+         !authenticatorAssertionResponse.response.clientDataJSON ||
+         !authenticatorAssertionResponse.response.signature ||
+         !authenticatorAssertionResponse.response.userHandle) {
+
+        console.log("Invalid credential given");
+        request.session.challenge = undefined;
+        request.session.credentialId = undefined;
+        return;
+    }
+});
+
+/**
+ * Logout route, destroyes the session and sends a status: true, to indicate successful logout
+ */
+router.get('/logout', (request,response) => {
+    request.session.destroy();
+    response.json({status: true});
+});
 
 // ---------- Registration handling ----------
 /** Called at 'webauthn/register'
@@ -300,31 +345,23 @@ function handleAttestation(attestationObject, fmt) {
 }
 
 // ---------- Assertion handling ----------
-
-function handleAssertion() {
-    try {
-
-        const assertionFile = fs.readFileSync('./assertion_creds/assertion_cred.json');  //TODO: replace with incoming object from client
-        let resp = JSON.parse(assertionFile).response;
-        
-        // ---- decoding client data json
-        let clientDataJSON = resp.clientDataJSON;
-        let clientData = JSON.parse(base64url.decode(clientDataJSON));
-        
-        console.log("Client Data JSON: ");
-        console.log(clientData);
-    
-        // ---- decoding authenticator data
-        let authDataJSON = resp.authenticatorData;
-        let authData = JSON.parse(base64url.decode(authDataJSON));
-        
-        console.log("Authenticator Data:");
-        console.log(authData);
-    
-    } catch(err) {
-        console.log(err);
-    }
-    
+/**
+ * This function is used in '/login/fetchRequestOptions' to give the assertion options to the client
+ * @param {string} credentialID 
+ * @returns Request parameters for the authenticator assertion
+ */
+function generateAssertionRequest(credentialID) {
+    return {
+        challenge : randomBase64URLBuffer(32),
+        allowCredentials: [{  //fix https://w3c.github.io/webauthn/#dom-publickeycredentialrequestoptions-allowcredentials
+            id: credentialID,
+            type: 'public-key',
+            transports: ['usb', 'nfc', 'ble', 'hybrid', 'internal']
+        }],
+        timeout: 30000
+    };
 }
+
+
 
 module.exports = router;

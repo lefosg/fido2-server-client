@@ -1,4 +1,5 @@
 //we use this object to control the user state, nothing special, we use this instead of having many variables
+//TODO: delete state var
 var state = {
     createResponse: null,
     publicKeyCredential: null,
@@ -36,9 +37,9 @@ function bufferEncode(value) {
 // Don't drop any blanks
 // decode
 // probably useless
-// function bufferDecode(value) {
-//     return Uint8Array.from(atob(value), c => c.charCodeAt(0));
-// }
+function bufferDecode(value) {
+    return Uint8Array.from(atob(value), c => c.charCodeAt(0));
+}
 
 function buffer2string(buf) {
     let str = "";
@@ -53,7 +54,7 @@ function buffer2string(buf) {
 
 
 function setUser() {
-    username = $("#email").val();
+    username = $("#username").val();
     state.user.name = username.toLowerCase().replace(/\s/g, '');
     state.user.displayName = username.toLowerCase();
 }
@@ -85,7 +86,6 @@ async function checkUserExists() {
     return userExists.status;
 }
 
-
 async function makeCredential() {
     //TODO: make login-button inactive while registering
     let userExists = await checkUserExists();
@@ -97,7 +97,7 @@ async function makeCredential() {
         return;
     }
     console.log("making a call to /webauthn/register/fetchCredOptions fetch credentials options")
-    if ($("#email").val() === "") {
+    if ($("#username").val() === "") {
         alert("Please enter a username");
         return;
     }
@@ -124,12 +124,13 @@ async function makeCredential() {
         /**
          * the server response looks like this: {msg: ..., status: true/false}
          * if status == false, then there was an error, and msg is a string with the message error (we alert it below)
-         * if status == true, then the value of msg is the PublicKeyCredentialCreationOptions, for brevity we call it credentialOptions
+         * if status == true, then the value of msg is the PublicKeyCredentialCreationOptions
          */
         if (!jsonResp.status) {
             alert(jsonResp.msg);
         }
-        credentialOptions = jsonResp.msg;
+        PublicKeyCredentialCreationOptions = jsonResp.msg;
+        credentialOptions = PublicKeyCredentialCreationOptions;  //for brevity we call it credentialOptions, we just wanted to demonstrate the fetching of the object
         console.log(credentialOptions);
         preformatCredOptions(credentialOptions);
         
@@ -215,7 +216,7 @@ async function sendAuthenticatorAttestationResponse(newCredential) {
 
 
 async function getAssertion() {
-    if ($("#email").val() === "") {
+    if ($("#username").val() === "") {
         alert("Please enter a username");
         return;
     }
@@ -228,35 +229,55 @@ async function getAssertion() {
         $('#register-button').attr("disabled", false);
         return;
     }
-    // $.get('/user/' + state.user.name + '/exists', {}, null, 'json').done(function (response) {
-    //         console.log(response);
-    //     }).then(function () {
-    //         $.get('https://webauthn.io/assertion/' + state.user.name, {}, null, 'json')
-    //             .done(function (makeAssertionOptions) {
-    //                 makeAssertionOptions.publicKey.challenge = bufferDecode(makeAssertionOptions.publicKey.challenge);
-    //                 makeAssertionOptions.publicKey.allowCredentials.forEach(function (listItem) {
-    //                     listItem.id = bufferDecode(listItem.id)
-    //                 });
-    //                 console.log("Assertion options received from the RP");
-    //                 console.log(makeAssertionOptions);
-    //                 navigator.credentials.get({
-    //                         publicKey: makeAssertionOptions.publicKey
-    //                     })
-    //                     .then(function (credential) {
-    //                         console.log(credential);
-    //                         verifyAssertion(credential);  //send assertion back to the RP
-    //                     }).catch(function (err) {
-    //                         console.log(err.name);
-    //                         alert(err.message);
-    //                     });
-    //             });
-    //     })
-    //     .catch(function (error) {
-    //         if (!error.exists) {
-    //             alert("User not found, try registering one first!");
-    //         }
-    //         return;
-    //     });
+
+    console.log("making a call to http://localhost:3000/webauthn/login/fetchAssertionOptions to fetch assertion options");
+    fetch('http://localhost:3000/webauthn/login/fetchAssertionOptions', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            username: state.user.name
+        })
+    })
+    .then(response => response.json())
+    .then(jsonResp => {  
+        /**
+         * the server response looks like this: {msg: ..., status: true/false}
+         * if status == false, then there was an error, and msg is a string with the message error (we alert it below)
+         * if status == true, then the value of msg is the PublicKeyCredentialRequestOptions
+         */
+
+        if (!jsonResp.status) {
+            alert(jsonResp.msg);
+        }
+
+        PublicKeyCredentialRequestOptions = jsonResp.msg;
+        assertionOptions = PublicKeyCredentialRequestOptions; //for brevity we call it assertionOptions, we just wanted to demonstrate the fetching of the object
+        console.log(assertionOptions);
+
+        assertionOptions.challenge = base64url.decode(assertionOptions.challenge);
+        assertionOptions.allowCredentials.forEach( credential => {
+            credential.id = base64url.decode(credential.id);
+        });
+
+        navigator.credentials.get({
+            publicKey: assertionOptions
+        })
+        .then(assertionResponse => {
+            console.log(assertionResponse);
+            sendAuthenticatorAssertionResponse(assertionResponse);
+        })
+        
+        $('#register-button').attr("disabled", false);
+    })
+    .catch(err => console.log(err));
+  
+}
+
+function sendAuthenticatorAssertionResponse(assertionResponse) {
+    console.log("Sending AuthenticatorAssertionResponse to the server")
 }
 
 function verifyAssertion(assertedCredential) {
@@ -292,3 +313,4 @@ function verifyAssertion(assertedCredential) {
 
 
 document.getElementById('register-button').addEventListener('click', makeCredential);
+document.getElementById('login-button').addEventListener('click', getAssertion);
