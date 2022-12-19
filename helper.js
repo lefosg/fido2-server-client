@@ -11,7 +11,20 @@ const cbor = require('cbor');
  * @returns the hash of the string input - sha256 
  */
 function hash(string) {
-    return createHash('sha256').update(string).digest('hex');
+    return createHash('sha256').update(string).digest();
+}
+
+/**
+ * Takes signature, data and PEM public key and tries to verify signature
+ * @param  {Buffer} signature
+ * @param  {Buffer} data
+ * @param  {String} publicKey - PEM encoded public key
+ * @return {Boolean}
+ */
+function verifySignature(signature, data, publicKey) {
+    return crypto.createVerify('SHA256')
+        .update(data)
+        .verify(publicKey, signature);
 }
 
 /**
@@ -55,59 +68,6 @@ function parseGetAssertAuthData(buffer) {
  * @returns an object containing authData of the attestation object
  */
 const parseGetAttestAuthData = (buffer) => {
-    //if(buffer.byteLength < 37)
-    //    throw new Error('Authenticator Data must be at least 37 bytes long!');
-//
-    //let rpIdHash      = buffer.slice(0, 32);             buffer = buffer.slice(32);
-//
-    ///* Flags */
-    //let flagsBuffer   = buffer.slice(0, 1);              buffer = buffer.slice(1);
-    //let flagsInt      = flagsBuffer[0];
-    //let up            = !!(flagsInt & 0x01); // Test of User Presence
-    //let uv            = !!(flagsInt & 0x04); // User Verification
-    //let at            = !!(flagsInt & 0x40); // Attestation data
-    //let ed            = !!(flagsInt & 0x80); // Extension data
-    //let flags = {up, uv, at, ed, flagsInt};
-//
-    //let counterBuffer = buffer.slice(0, 4);               buffer = buffer.slice(4);
-    //let counter       = counterBuffer.readUInt32BE(0);
-//
-    ///* Attested credential data */
-    //let aaguid              = undefined;
-    //let aaguidBuffer        = undefined;
-    //let credIdBuffer        = undefined;
-    //let cosePublicKeyBuffer = undefined;
-    //let attestationMinLen   = 16 + 2 + 16 + 42; // aaguid + credIdLen + credId + pk
-//
-//
-    //if(at) { // Attested Data
-    //    if(buffer.byteLength < attestationMinLen)
-    //        throw new Error(`It seems as the Attestation Data flag is set, but the remaining data is smaller than ${attestationMinLen} bytes. You might have set AT flag for the assertion response.`)
-//
-    //    aaguid              = buffer.slice(0, 16).toString('hex'); buffer = buffer.slice(16);
-    //    aaguidBuffer        = `${aaguid.slice(0, 8)}-${aaguid.slice(8, 12)}-${aaguid.slice(12, 16)}-${aaguid.slice(16, 20)}-${aaguid.slice(20)}`;
-//
-    //    let credIdLenBuffer = buffer.slice(0, 2);                  buffer = buffer.slice(2);
-    //    let credIdLen       = credIdLenBuffer.readUInt16BE(0);
-    //    credIdBuffer        = buffer.slice(0, credIdLen);          buffer = buffer.slice(credIdLen);
-//
-    //    let pubKeyLength    = vanillacbor.decodeOnlyFirst(buffer).byteLength;
-    //    cosePublicKeyBuffer = buffer.slice(0, pubKeyLength);       buffer = buffer.slice(pubKeyLength);
-    //    cosePublicKeyBuffer = cbor.decodeAllSync(cosePublicKeyBuffer);  //added by me
-    //    console.log(cosePublicKeyBuffer);
-    //}
-//
-    //let coseExtensionsDataBuffer = undefined;
-    //if(ed) { // Extension Data
-    //    let extensionsDataLength = vanillacbor.decodeOnlyFirst(buffer).byteLength;
-//
-    //    coseExtensionsDataBuffer = buffer.slice(0, extensionsDataLength); buffer = buffer.slice(extensionsDataLength);
-    //}
-//
-    //if(buffer.byteLength)
-    //    throw new Error('Failed to decode authData! Leftover bytes been detected!');
-//
-    //return {rpIdHash, counter, flags, counterBuffer, aaguid, credIdBuffer, cosePublicKeyBuffer, coseExtensionsDataBuffer}
     let rpIdHash      = buffer.slice(0, 32);          buffer = buffer.slice(32);
     let flagsBuffer   = buffer.slice(0, 1);              buffer = buffer.slice(1);
     let flagsInt      = flagsBuffer[0];
@@ -157,16 +117,66 @@ function COSEECDHAtoPKCS(COSEPublicKey) {
 
         let coseStruct = COSEPublicKey;
         let tag = Buffer.from([0x04]);
-        let x   = coseStruct.get(-1);
-        let y   = coseStruct.get(-2);
+        let x   = coseStruct.get(-2);
+        let y   = coseStruct.get(-3);
 
         return Buffer.concat([tag, x, y])
 }
 
+/**
+ * Convert binary certificate or public key to an OpenSSL-compatible PEM text format.
+ * @param  {Buffer} buffer - Cert or PubKey buffer
+ * @return {String}             - PEM
+ */
+let ASN1toPEM = (pkBuffer) => {
+    if (!Buffer.isBuffer(pkBuffer))
+        throw new Error("ASN1toPEM: pkBuffer must be Buffer.")
+
+    let type;
+    if (pkBuffer.length == 65 && pkBuffer[0] == 0x04) {
+        /*
+            If needed, we encode rawpublic key to ASN structure, adding metadata:
+            SEQUENCE {
+              SEQUENCE {
+                 OBJECTIDENTIFIER 1.2.840.10045.2.1 (ecPublicKey)
+                 OBJECTIDENTIFIER 1.2.840.10045.3.1.7 (P-256)
+              }
+              BITSTRING <raw public key>
+            }
+            Luckily, to do that, we just need to prefix it with constant 26 bytes (metadata is constant).
+        */
+        
+        pkBuffer = Buffer.concat([
+            new Buffer.from("3059301306072a8648ce3d020106082a8648ce3d030107034200", "hex"),
+            pkBuffer
+        ]);
+
+        type = 'PUBLIC KEY';
+    } else {
+        type = 'CERTIFICATE';
+    }
+
+    let b64cert = pkBuffer.toString('base64');
+
+    let PEMKey = '';
+    for(let i = 0; i < Math.ceil(b64cert.length / 64); i++) {
+        let start = 64 * i;
+
+        PEMKey += b64cert.substr(start, 64) + '\n';
+    }
+
+    PEMKey = `-----BEGIN ${type}-----\n` + PEMKey + `-----END ${type}-----\n`;
+    
+    return PEMKey
+}
+
+
 module.exports ={
     hash,
+    verifySignature,
     COSEECDHAtoPKCS,
     randomBase64URLBuffer,
     parseGetAttestAuthData,
     parseGetAssertAuthData,
+    ASN1toPEM
 };

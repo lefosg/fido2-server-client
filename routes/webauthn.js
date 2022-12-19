@@ -2,8 +2,9 @@ const { Router } = require('express');
 const base64url  = require('base64url');
 const cbor = require('cbor');
 const fs = require('fs');
-const {hash, COSEECDHAtoPKCS, randomBase64URLBuffer, parseGetAttestAuthData} = require('../helper.js')
+const {hash, COSEECDHAtoPKCS, randomBase64URLBuffer, parseGetAttestAuthData, parseGetAssertAuthData, verifySignature, ASN1toPEM} = require('../helper.js')
 const User = require('../database/schemas/User');
+const { createHash } = require('crypto')
 
 
 //RP data/local variables, could have a database containing them
@@ -13,7 +14,7 @@ const operationTypes = {
     'create' : 'webauthn.create',
     'get' : 'webauthn.get'
 };
-const ExpectedRPIDHash = hash("localhost");  //cut 'https://'
+const ExpectedRPIDHash = createHash('sha256').update(rpEffectiveDomain).digest('hex');;  //cut 'https://'
 
 const router = Router();
 
@@ -44,8 +45,6 @@ router.post('/register/fetchCredOptions', async (request, response) => {
     request.session.challenge = PublicKeyCredentialCreationOptions.challenge;
     request.session.username = username;
     request.session.UserId = PublicKeyCredentialCreationOptions.user.id;
-    console.log("wtf",PublicKeyCredentialCreationOptions.user.id)
-    console.log("on creation:",request.session.UserId);
     //console.log(PublicKeyCredentialCreationOptions);
     response.json({msg: PublicKeyCredentialCreationOptions, status:true});
 });
@@ -127,9 +126,10 @@ router.post('/login/fetchAssertionOptions', async (request, response) => {
     }
 });
 
-router.post('/login/verifyAssertion', (request, response) => {
+router.post('/login/verifyAssertion', async (request, response) => {
     //if request body is empty => credential creation abandonment!
     let authenticatorAssertionResponse = request.body;
+    console.log(authenticatorAssertionResponse);
     if ( !authenticatorAssertionResponse.id ||
          !authenticatorAssertionResponse.rawId ||
          !authenticatorAssertionResponse.response.authenticatorData ||
@@ -142,6 +142,38 @@ router.post('/login/verifyAssertion', (request, response) => {
         request.session.credentialId = undefined;
         return;
     }
+
+    // ---- decoding client data json
+    clientDataJSON = authenticatorAssertionResponse.response.clientDataJSON;
+    clientDataJSON = JSON.parse(base64url.decode(clientDataJSON));
+    console.log("ClientDataJSON:");
+    console.log(clientDataJSON);
+
+    // ---- decoding client data json
+    authenticatorDataBuffer = base64url.toBuffer(authenticatorAssertionResponse.response.authenticatorData);
+
+    /**
+    * To verify the signature concatenate: clientDataHash + authenticatorDataBytes
+    * Get public key from DB
+    * Call verify function
+    */
+    let userHandle = authenticatorAssertionResponse.response.userHandle;
+    let clientDataHash = hash(base64url.toBuffer(authenticatorAssertionResponse.response.clientDataJSON));
+    let authenticatorData = parseGetAssertAuthData(authenticatorDataBuffer);
+    console.log("Authenticator Data:");
+    console.log(authenticatorData);
+    let signatureBase = Buffer.concat([authenticatorData.rpIdHash, authenticatorData.flagsBuf, authenticatorData.counterBuf, clientDataHash]);
+    let signature = base64url.toBuffer(authenticatorAssertionResponse.response.signature);
+    let publicKey, verified;
+    try {  //to catch database related error
+        publicKey = (await User.find({userId: userHandle}))[0].publicKey;  
+        publicKey = ASN1toPEM(base64url.toBuffer(publicKey));
+        verified = verifySignature(signature, signatureBase, publicKey);
+    } catch (error) {
+        console.log(error);
+        verified = false;
+    }  
+    console.log("verified",verified);
 });
 
 /**
@@ -356,7 +388,7 @@ function generateAssertionRequest(credentialID) {
         allowCredentials: [{  //fix https://w3c.github.io/webauthn/#dom-publickeycredentialrequestoptions-allowcredentials
             id: credentialID,
             type: 'public-key',
-            transports: ['usb', 'nfc', 'ble', 'hybrid', 'internal']
+            transports: ['internal', 'usb', 'nfc', 'ble', 'hybrid']
         }],
         timeout: 30000
     };

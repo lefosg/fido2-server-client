@@ -266,6 +266,7 @@ async function getAssertion() {
             publicKey: assertionOptions
         })
         .then(assertionResponse => {
+            console.log("Assertion created");
             console.log(assertionResponse);
             sendAuthenticatorAssertionResponse(assertionResponse);
         })
@@ -277,7 +278,29 @@ async function getAssertion() {
 }
 
 function sendAuthenticatorAssertionResponse(assertionResponse) {
-    console.log("Sending AuthenticatorAssertionResponse to the server")
+    console.log("Sending AuthenticatorAssertionResponse to the server");
+
+    fetch('http://localhost:3000/webauthn/login/verifyAssertion', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            id: assertionResponse.id,
+            rawId: window.base64url['encode'](assertionResponse.rawId),
+            response: {
+                authenticatorData: window.base64url['encode'](assertionResponse.response.authenticatorData),
+                clientDataJSON: window.base64url['encode'](assertionResponse.response.clientDataJSON),
+                signature: window.base64url['encode'](assertionResponse.response.signature),
+                userHandle: window.base64url['encode'](assertionResponse.response.userHandle),
+            },
+            type: assertionResponse.type
+        })
+    })
+    .then(statusResult => statusResult.json())
+    .then(res => console.log("result",res))
+    .catch(err => err);
 }
 
 function verifyAssertion(assertedCredential) {
