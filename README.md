@@ -87,7 +87,7 @@ var PublicKeyCredentialCreationOptionsDuo = {
 This is how the response should look like in this request. After getting these parameters, the client must now make a call to the authenticator to create the credentials and attestation.
 
 ```js
-const authenticatorAttestationResponse = navigator.credentials.create({
+const authenticatorAttestationResponse = await navigator.credentials.create({
     publicKey: PublicKeyCredentialCreationOptionsDuo
 })
 console.log(authenticatorAttestationResponse);
@@ -141,7 +141,7 @@ var PublicKeyCredentialRequestOptions =
 The client then makes the following call that outputs the **AuthenticatorAssertionResponse** object.
 
 ```js
-const authenticatorAssertionResponse = navigator.credentials.create({
+const authenticatorAssertionResponse = await navigator.credentials.create({
     publicKey: PublicKeyCredentialRequestOptions
 })
 console.log(authenticatorAssertionResponse);
