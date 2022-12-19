@@ -398,11 +398,13 @@ function handleAttestation(attestationObject, fmt) {
 function generateAssertionRequest(credentialID) {
     return {
         challenge : randomBase64URLBuffer(32),
+
         allowCredentials: [{  //fix https://w3c.github.io/webauthn/#dom-publickeycredentialrequestoptions-allowcredentials
             id: credentialID,
             type: 'public-key',
             transports: ['hybrid']
         }],
+        
         timeout: 100000
     };
 }

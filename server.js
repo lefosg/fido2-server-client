@@ -1,13 +1,14 @@
-const express       = require('express');
-const bodyParser    = require('body-parser');
+const express        = require('express');
+const bodyParser     = require('body-parser');
 const expressSession = require('express-session');
-const cookieParser  = require('cookie-parser');
-const path          = require('path');
-const crypto        = require('crypto');
+const cookieParser   = require('cookie-parser');
+const path           = require('path');
+const crypto         = require('crypto');
+const { randomBase64URLBuffer } = require('./helper');
 
 
 /** Database
- * We use mongo db to store public key credentials and query them based on the username(?) 
+ * We use mongo db to store credentials 
  */
 const MongoStore    = require('connect-mongo');
 require('./database/db');
@@ -15,7 +16,6 @@ require('./database/db');
 //routes
 const defaultroutes = require('./routes/default.js');
 const webuathnauth  = require('./routes/webauthn.js');
-const { randomBase64URLBuffer } = require('./helper');
 
 const app           = express();
 const port          = 3000;
