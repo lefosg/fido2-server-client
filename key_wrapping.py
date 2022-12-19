@@ -1,4 +1,4 @@
-#[1] soruce link: <https://asecuritysite.com/encryption/kek>
+#[1] source link: <https://asecuritysite.com/encryption/kek>
 
 """
 This file is just a demonstration of how we can handle encryption with non-resident keys.
