@@ -59,9 +59,7 @@ router.post('/register/storeCredentials', async (request, response) => {
     //if request body is empty => credential creation abandonment!
     if (Object.keys(request.body).length === 0) {
         console.log("Abandoned key creation at client side, clearing sessions variables");
-        request.session.challenge = undefined;
-        request.session.username = undefined;
-        request.session.UserId = undefined;
+        clearSessionVariables([request.session.challenge, request.session.username, request.session.UserId]);
         return;
     }
     
@@ -90,10 +88,7 @@ router.post('/register/storeCredentials', async (request, response) => {
                     credentialID: credId.toString(), 
                     counter: counter 
                 });
-
-                request.session.challenge = undefined;
-                request.session.username = undefined;
-                request.session.UserId = undefined;   
+                clearSessionVariables([request.session.challenge, request.session.username, request.session.UserId]); 
 
                 response.json({status: true});
                 console.log("Successfully stored credential in database..");
@@ -122,6 +117,7 @@ router.post('/login/fetchAssertionOptions', async (request, response) => {
         let PublicKeyCredentialRequestOptions = generateAssertionRequest(userInfo.credentialID);
         request.session.challenge = PublicKeyCredentialRequestOptions.challenge;
         request.session.credId = userInfo.credentialID;
+        request.session.username = username;
         response.json({status: true, msg: PublicKeyCredentialRequestOptions});
     }
 });
@@ -134,12 +130,11 @@ router.post('/login/verifyAssertion', async (request, response) => {
          !authenticatorAssertionResponse.rawId ||
          !authenticatorAssertionResponse.response.authenticatorData ||
          !authenticatorAssertionResponse.response.clientDataJSON ||
-         !authenticatorAssertionResponse.response.signature ||
-         !authenticatorAssertionResponse.response.userHandle) {
+         !authenticatorAssertionResponse.response.signature) {
 
         console.log("Invalid credential given");
-        request.session.challenge = undefined;
-        request.session.credentialId = undefined;
+        
+        clearSessionVariables(request.session.challenge, request.session.credentialId);
         return;
     }
 
@@ -157,7 +152,7 @@ router.post('/login/verifyAssertion', async (request, response) => {
     * Get public key from DB
     * Call verify function
     */
-    let userHandle = authenticatorAssertionResponse.response.userHandle;
+
     let clientDataHash = hash(base64url.toBuffer(authenticatorAssertionResponse.response.clientDataJSON));
     let authenticatorData = parseGetAssertAuthData(authenticatorDataBuffer);
     console.log("Authenticator Data:");
@@ -166,12 +161,21 @@ router.post('/login/verifyAssertion', async (request, response) => {
     let signature = base64url.toBuffer(authenticatorAssertionResponse.response.signature);
     let publicKey, verified;
     try {  //to catch database related error
-        publicKey = (await User.find({userId: userHandle}))[0].publicKey;  
+        publicKey = (await User.find({username: request.session.username}))[0].publicKey;  
         publicKey = ASN1toPEM(base64url.toBuffer(publicKey));
         verified = verifySignature(signature, signatureBase, publicKey);
+        if (verified) {
+            updateCounter(request.session.username, authenticatorData.counter);
+            request.session.loggedIn = true;
+            response.json({status: true, msg: "Successfully logged in"});
+        } else {
+            verified = false;
+            response.json({status:false, msg: "Could not authenticate user"});    
+        }
     } catch (error) {
         console.log(error);
         verified = false;
+        response.json({status:false, msg: "Could not authenticate user"});
     }  
     console.log("verified",verified);
 });
@@ -179,9 +183,17 @@ router.post('/login/verifyAssertion', async (request, response) => {
 /**
  * Logout route, destroyes the session and sends a status: true, to indicate successful logout
  */
-router.get('/logout', (request,response) => {
-    request.session.destroy();
-    response.json({status: true});
+router.delete('/logout', (request,response) => {
+    try {
+        if (request.session) {
+            request.session.destroy();
+            request.sessionStore.destroy(request.sessionID);
+            response.json({status: true, msg: "Successfully logged out"});
+        }
+    } catch (err) {
+        console.log(err);
+        response.json({status: false, msg: "Could not log out"})
+    }
 });
 
 // ---------- Registration handling ----------
@@ -234,10 +246,11 @@ function generateAttestationRequest(username, attestationType, authenticatorType
                 authenticatorSelection: {
                     authenticatorAttachment: authenticatorType,  //can use any authenticator - platform/roaming, again for this example let the user decide
                     requireResidentKey: true,  //decide if resident keys will be used or not! Values: true/false. More on resident keys: https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/Resident_Keys.html
-                    userVerification: "preferred"  //values: "preferred", "discouraged", "required", more: https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/User_Presence_vs_User_Verification.html
+                    userVerification: "preferred",  //values: "preferred", "discouraged", "required", more: https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/User_Presence_vs_User_Verification.html
+                    residentKey: 'required'  //this field still exists for backwards compatibility purposes
                 },
                 excludeCredentials: [],  //limit the creation of multiple credentials
-                timeout: 30000
+                timeout: 100000
               }
         }
 }
@@ -388,12 +401,30 @@ function generateAssertionRequest(credentialID) {
         allowCredentials: [{  //fix https://w3c.github.io/webauthn/#dom-publickeycredentialrequestoptions-allowcredentials
             id: credentialID,
             type: 'public-key',
-            transports: ['internal', 'usb', 'nfc', 'ble', 'hybrid']
+            transports: ['hybrid']
         }],
-        timeout: 30000
+        timeout: 100000
     };
 }
 
+function updateCounter(username, counter) {
+    User.updateOne( {username: username}, 
+        {
+            $set: {
+                counter: counter
+            }
+        }
+    )
+}
 
+/**
+ * 
+ * @param {array} variablesList 
+ */
+function clearSessionVariables(sessionVariablesList) {
+    sessionVariablesList.forEach(sesVar => {
+        sesVar = undefined;
+    });
+}
 
 module.exports = router;

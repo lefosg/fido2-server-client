@@ -115,12 +115,16 @@ function COSEECDHAtoPKCS(COSEPublicKey) {
        +------+-------+-------+---------+----------------------------------+
     */
 
-        let coseStruct = COSEPublicKey;
-        let tag = Buffer.from([0x04]);
-        let x   = coseStruct.get(-2);
-        let y   = coseStruct.get(-3);
+        try {
+            let coseStruct = COSEPublicKey;
+            let tag = Buffer.from([0x04]);
+            let x   = coseStruct.get(-2);
+            let y   = coseStruct.get(-3);
+            return Buffer.concat([tag, x, y])
+        } catch (err) {
+            console.log(err);
+        }
 
-        return Buffer.concat([tag, x, y])
 }
 
 /**

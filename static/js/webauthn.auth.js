@@ -74,7 +74,7 @@ function preformatCredOptions(credOptions) {
  */
 async function checkUserExists() {
     setUser();
-    console.log("making a call to /user/:username to check user existence..")
+    console.log("making a call to http://localhost:3000/user/:username to check user existence..")
     let response = await fetch('http://localhost:3000/user/' + state.user.name, {
         method: 'GET',
         headers: {
@@ -270,6 +270,7 @@ async function getAssertion() {
             console.log(assertionResponse);
             sendAuthenticatorAssertionResponse(assertionResponse);
         })
+        .catch(err => console.log(err)); 
         
         $('#register-button').attr("disabled", false);
     })
@@ -277,63 +278,54 @@ async function getAssertion() {
   
 }
 
-function sendAuthenticatorAssertionResponse(assertionResponse) {
+async function sendAuthenticatorAssertionResponse(assertionResponse) {
     console.log("Sending AuthenticatorAssertionResponse to the server");
 
-    fetch('http://localhost:3000/webauthn/login/verifyAssertion', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            id: assertionResponse.id,
-            rawId: window.base64url['encode'](assertionResponse.rawId),
-            response: {
-                authenticatorData: window.base64url['encode'](assertionResponse.response.authenticatorData),
-                clientDataJSON: window.base64url['encode'](assertionResponse.response.clientDataJSON),
-                signature: window.base64url['encode'](assertionResponse.response.signature),
-                userHandle: window.base64url['encode'](assertionResponse.response.userHandle),
-            },
-            type: assertionResponse.type
-        })
-    })
-    .then(statusResult => statusResult.json())
-    .then(res => console.log("result",res))
-    .catch(err => err);
+    try {
+	    let result = await fetch('http://localhost:3000/webauthn/login/verifyAssertion', {
+	        method: 'POST',
+	        headers: {
+	            'Accept': 'application/json',
+	            'Content-Type': 'application/json'
+	        },
+	        body: JSON.stringify({
+	            id: assertionResponse.id,
+	            rawId: window.base64url['encode'](assertionResponse.rawId),
+	            response: {
+	                authenticatorData: window.base64url['encode'](assertionResponse.response.authenticatorData),
+	                clientDataJSON: window.base64url['encode'](assertionResponse.response.clientDataJSON),
+	                signature: window.base64url['encode'](assertionResponse.response.signature),
+	                userHandle: window.base64url['encode'](assertionResponse.response.userHandle),
+	            },
+	            type: assertionResponse.type
+	        })
+	    });
+
+        let status = await result.json();
+        console.log(status);
+
+    } catch (err) {
+        console.log(err);
+    }
 }
 
-function verifyAssertion(assertedCredential) {
-    // Move data into Arrays incase it is super long
-    console.log('calling verify')
-    let authData = new Uint8Array(assertedCredential.response.authenticatorData);
-    let clientDataJSON = new Uint8Array(assertedCredential.response.clientDataJSON);
-    let rawId = new Uint8Array(assertedCredential.rawId);
-    let sig = new Uint8Array(assertedCredential.response.signature);
-    let userHandle = new Uint8Array(assertedCredential.response.userHandle);
-    $.ajax({
-        url: 'https://webauthn.io/assertion',
-        type: 'POST',
-        data: JSON.stringify({
-            id: assertedCredential.id,
-            rawId: bufferEncode(rawId),
-            type: assertedCredential.type,
-            response: {
-                authenticatorData: bufferEncode(authData),
-                clientDataJSON: bufferEncode(clientDataJSON),
-                signature: bufferEncode(sig),
-                userHandle: bufferEncode(userHandle),
-            },
-        }),
-        contentType: "application/json; charset=utf-8",
-        dataType: "json",
-        success: function (response) {
-            window.location = "https://webauthn.io/dashboard"
-            console.log(response)
-        }
-    });
-}
+async function logout() {
 
+    try {
+        let result = await fetch('http://localhost:3000/webauthn/logout', {
+            method: 'delete',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        let status = await result.json();
+        console.log(status);
+    } catch (err) {
+        console.log(err);
+    }
+
+}
 
 document.getElementById('register-button').addEventListener('click', makeCredential);
 document.getElementById('login-button').addEventListener('click', getAssertion);
+document.getElementById('logout-button').addEventListener('click', logout)
