@@ -24,10 +24,6 @@ const router = Router();
  * Note: we save all information related to the client with express sessions
  */
 router.post('/register/fetchCredOptions', async (request, response) => {
-    console.log(randomBase64URLBuffer())
-    console.log(randomBase64URLBuffer())
-    console.log(randomBase64URLBuffer())
-    console.log(randomBase64URLBuffer())
     let {username, attestationType, authenticatorType} = request.body;
 
     //check if parameters were given
@@ -47,7 +43,9 @@ router.post('/register/fetchCredOptions', async (request, response) => {
     //store session variables for later check in the 'webauthn/register/storeCredentials' endpoint
     request.session.challenge = PublicKeyCredentialCreationOptions.challenge;
     request.session.username = username;
-    request.session.id = PublicKeyCredentialCreationOptions.user.id;
+    request.session.UserId = PublicKeyCredentialCreationOptions.user.id;
+    console.log("wtf",PublicKeyCredentialCreationOptions.user.id)
+    console.log("on creation:",request.session.UserId);
     //console.log(PublicKeyCredentialCreationOptions);
     response.json({msg: PublicKeyCredentialCreationOptions, status:true});
 });
@@ -62,9 +60,9 @@ router.post('/register/storeCredentials', async (request, response) => {
     //if request body is empty => credential creation abandonment!
     if (Object.keys(request.body).length === 0) {
         console.log("Abandoned key creation at client side, clearing sessions variables");
-        request.session.challenge = "";
-        request.session.username = "";
-        request.session.id = "";
+        request.session.challenge = undefined;
+        request.session.username = undefined;
+        request.session.UserId = undefined;
         return;
     }
     
@@ -72,10 +70,9 @@ router.post('/register/storeCredentials', async (request, response) => {
     let authenticatorAttestationResponse = request.body;
     let challenge = request.session.challenge;
     let username = request.session.username;
-    let userId = request.session.id;
 
     let resultP = verifyStoreCredentialsRequest(authenticatorAttestationResponse, challenge);
-
+    //that's ugly code, the function above returns a promise so it has to be resolved below
     resultP.then(async res =>  {
 
         if (res.result) {
@@ -87,22 +84,18 @@ router.post('/register/storeCredentials', async (request, response) => {
                 let credId = res.credentialID;
                 let counter = res.counter;
 
-                console.log({  //saves user in DB
-                    userId: userId, 
-                    username: username, 
-                    publicKey: pk.toString(), 
-                    credentialID: credId.toString(), 
-                    counter: counter});
-
                 await User.create({  //saves user in DB
-                    userId: userId, 
+                    userId: request.session.UserId, 
                     username: username, 
                     publicKey: pk.toString(), 
                     credentialID: credId.toString(), 
-                    counter: counter});
+                    counter: counter 
+                });
+
                 request.session.challenge = undefined;
                 request.session.username = undefined;
-                request.session.id = undefined;    
+                request.session.UserId = undefined;   
+
                 response.json({status: true});
             } catch (err) {
                 console.log(err);
