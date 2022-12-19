@@ -113,7 +113,7 @@ The `authenticatorAttestationResponse.response.attestationObject` includes the p
 
 Finally the server responds with a status code of true/false to flag the successful storage of the public key credential in the database
 
-## Authentication
+## WebAuthn Authentication
 
 In authentication things are not different. Below we can see a flow of the calls between the client and the server.<br>
 <img src="./sources/webauthn_authentication.svg"> <br>
