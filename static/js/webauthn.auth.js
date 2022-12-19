@@ -148,30 +148,36 @@ async function makeCredential() {
             state.createResponse = newCredential;
             sendAuthenticatorAttestationResponse(newCredential);  
         }).catch(function (err) { 
-            //SOS, on credential creation abandonment, update the server to clear its session variables, and for the frontend reset the state variable (see top of the file) 
-            fetch('http://localhost:3000/webauthn/register/storeCredentials', {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({})
-            });
-            state = {
-                createResponse: null,
-                publicKeyCredential: null,
-                credential: null,
-                user: {
-                    name: "foo",
-                    displayName: "foo"
-                },
-            };
-            $('#login-button').attr("disabled", false);
+            //on credential creation abandonment, update the server to clear its session variables, and for the frontend reset the state variable (see top of the file) 
+            abandonRegistration();
             console.log(err)
         });
     })
     .catch(error => console.log(error));
 
+}
+
+function abandonRegistration() {
+    alert("Error on registration")
+    fetch('http://localhost:3000/webauthn/register/storeCredentials', {
+        method: 'POST',
+        headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({})
+    });
+
+    state = {
+        createResponse: null,
+        publicKeyCredential: null,
+        credential: null,
+        user: {
+            name: "foo",
+            displayName: "foo"
+        },
+    };
+    $('#login-button').attr("disabled", false);
 }
 
 /**
@@ -201,6 +207,7 @@ async function sendAuthenticatorAttestationResponse(newCredential) {
     });
 
     let status = await statusResponse.json();
+    
     if (status.status) {
         $('#login-button').attr("disabled", false);
     }

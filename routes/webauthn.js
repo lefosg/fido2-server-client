@@ -24,9 +24,14 @@ const router = Router();
  * Note: we save all information related to the client with express sessions
  */
 router.post('/register/fetchCredOptions', async (request, response) => {
+    console.log(randomBase64URLBuffer())
+    console.log(randomBase64URLBuffer())
+    console.log(randomBase64URLBuffer())
+    console.log(randomBase64URLBuffer())
     let {username, attestationType, authenticatorType} = request.body;
 
     //check if parameters were given
+    console.log(username, attestationType, authenticatorType);
     if (!username || !attestationType || !authenticatorType) {
         response.json({msg:"No username or attestationType or authenticatorType found in register form", status:false});
         return;
@@ -77,19 +82,28 @@ router.post('/register/storeCredentials', async (request, response) => {
             //Finally, store authenticator, counter, credId, pubicKey in database
             try {  //use try to check if we have a database related error
                 console.log("Storing new credentials in database..");
-                //UserSchema: userId, username, publicKey, credentialID, counter, format, createdAt->not needed to input, automatically  created
+                //UserSchema: userId, username, publicKey, credentialID, counter, createdAt->not needed to input, automatically  created
                 let pk = res.publicKey;
                 let credId = res.credentialID;
                 let counter = res.counter;
-                let format = res.fmt;
-                let newUser = await User.create({  //saves user in DB
+
+                console.log({  //saves user in DB
                     userId: userId, 
                     username: username, 
                     publicKey: pk.toString(), 
                     credentialID: credId.toString(), 
-                    counter: counter, 
-                    format: format});
-                    response.json({status: true});
+                    counter: counter});
+
+                await User.create({  //saves user in DB
+                    userId: userId, 
+                    username: username, 
+                    publicKey: pk.toString(), 
+                    credentialID: credId.toString(), 
+                    counter: counter});
+                request.session.challenge = undefined;
+                request.session.username = undefined;
+                request.session.id = undefined;    
+                response.json({status: true});
             } catch (err) {
                 console.log(err);
                 response.json({status: false});
@@ -136,6 +150,10 @@ function generateAttestationRequest(username, attestationType, authenticatorType
                 {
                     type: "public-key", 
                     alg: -7 // //see https://www.iana.org/assignments/cose/cose.xhtml#algorithms full registry
+                }, 
+                { 
+                    type: 'public-key', 
+                    alg: -257 
                 }
             ], 
 
@@ -174,17 +192,16 @@ async function verifyStoreCredentialsRequest(authenticatorAttestationResponse, s
     console.log(clientData);    
     
     // ---- decoding attestation object
-    let attestationObject       = authenticatorAttestationResponse.response.attestationObject;
-    let attestationObjectBuffer = base64url.toBuffer(attestationObject);
-    let ctapMakeCredResp        = cbor.decodeAllSync(attestationObjectBuffer)[0];  //CTAP2 encodes with CBOR, so we must decode
+    let responseAttestationObject       = authenticatorAttestationResponse.response.attestationObject;  //contains fmt, attStmt, authData
+    let attestationObjectBuffer  = base64url.toBuffer(responseAttestationObject);
+    let attestationObject        = cbor.decodeAllSync(attestationObjectBuffer)[0];  //CTAP2 encodes with CBOR, so we must decode
     
     console.log("Client attestation object:");
-    console.log(ctapMakeCredResp);
+    console.log(attestationObject);
     
     // ---- decoding authData
     
-    //authData.publicKey is encoded in COSE_Key format
-    let authData = parseGetAttestAuthData(ctapMakeCredResp.authData);  //authData
+    let authData = parseGetAttestAuthData(attestationObject.authData);  //authData
     console.log("Auth Data:");
     console.log(authData);
     
@@ -232,25 +249,23 @@ async function verifyStoreCredentialsRequest(authenticatorAttestationResponse, s
     
     //6. Check if the authenticator added attestation data, if the RP cares about attestation
     let verificationResult = false;
-    if (authData.flags['up'] == true) {  //probably need to verify the attestation!
-        console.log("Attestation flag is enabled. Proceeding to check attestation");
+    if (attestationObject.fmt != "none") {  //probably need to verify the attestation!
         //check attestation format and proceed accordingly
-        let attestationFmt = ctapMakeCredResp.fmt;
-        verificationResult = handleAttestation(attestationFmt);
+        let attestationFmt = attestationObject.fmt;
+        verificationResult = handleAttestation(attestationObject, attestationFmt);
         if (verificationResult == false) {
             return {result: false};
         }
     }
+    console.log("Attestation is set to none, skipping attestation");
 
     return {
         result: true,
-        publicKey: base64url.encode(COSEECDHAtoPKCS(authData.cosePublicKeyBuffer)),
+        publicKey: base64url.encode(COSEECDHAtoPKCS(authData.cosePublicKeyBuffer)),  //decode public key (it is encoded in COSE form) and store is as base64url string
         credentialID: credentialID,
         counter: authData.counter,
-        fmt: ctapMakeCredResp.fmt
+        fmt: attestationObject.fmt
     };
-
-    
 }
 
 /**
@@ -259,7 +274,9 @@ async function verifyStoreCredentialsRequest(authenticatorAttestationResponse, s
  * @returns true if attestation verification was successfull, else false
  * @link https://www.w3.org/TR/webauthn/#sctn-defined-attestation-formats
  */
-function handleAttestation(fmt) {
+function handleAttestation(attestationObject, fmt) {
+    console.log("format:", fmt);
+    console.log("attestation object:", attestationObject);
     if (fmt == "none") {
         console.log("Attestation format is 'none', don't check anything");
     }

@@ -26,11 +26,6 @@ const UserSchema = new mongoose.Schema({
         required: true,
         unique: false
     },
-    format: {
-        type: mongoose.SchemaTypes.String,
-        required: false,
-        unique: false
-    },
     createdAt: {
         type: mongoose.SchemaTypes.Date,
         required: true,

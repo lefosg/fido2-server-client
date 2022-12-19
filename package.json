@@ -29,6 +29,8 @@
     "mongoose": "^6.8.0"
   },
   "devDependencies": {
-    "nodemon": "^2.0.20"
+    "cbor-js": "github:paroga/cbor-js",
+    "nodemon": "^2.0.20",
+    "vanillacbor": "github:WebauthnWorks/vanillacbor"
   }
 }
