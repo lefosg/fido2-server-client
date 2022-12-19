@@ -122,20 +122,19 @@ The user navigates to a login form and enters the account username. A request is
 
 ```js
 
-var PublicKeyCredentialRequestOptions = 
-    {
-        challenge : randomBase64URLBuffer(32),
+var PublicKeyCredentialRequestOptions =  {
+    challenge : randomBase64URLBuffer(32),
 
-        allowCredentials: [
-            {  
-              id: credentialID,
-              type: 'public-key',
-              transports: ['usb', 'ble', 'nfc', 'internal']
-            }
-        ],
+    allowCredentials: [
+        {  
+          id: credentialID,
+          type: 'public-key',
+          transports: ['usb', 'ble', 'nfc', 'internal']
+        }
+    ],
 
-        timeout: 100000
-    };
+    timeout: 100000
+};
 ```
 
 The client then makes the following call that outputs the **AuthenticatorAssertionResponse** object.
