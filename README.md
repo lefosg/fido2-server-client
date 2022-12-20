@@ -109,6 +109,47 @@ The result of the `console.log(authenticatorAttestationResponse)` should look li
 ```
 Note: that is a sample response, it is not the one corresponding to the above **PublicKeyCredentialCreationOptions**. Also, the `authenticatorAttestationResponse` is of type *PublicKeyCredential*. 
 
+If decoded, it looks like this:
+
+```json
+{
+    "rawId": "Aad50Szy7ZFb8f7wdfMmFO2dUdQB8StMrYBbhJprTCJIKVdbIiMs9dAATKOvUpoKfmyh662ZsO1J5PQUsi9yKNumDR-ZD4wevDYZnwprytGf5rn6ydyxQQtBYPSwS8u23FdVBxBqHa8",
+    "id": "Aad50Szy7ZFb8f7wdfMmFO2dUdQB8StMrYBbhJprTCJIKVdbIiMs9dAATKOvUpoKfmyh662ZsO1J5PQUsi9yKNumDR-ZD4wevDYZnwprytGf5rn6ydyxQQtBYPSwS8u23FdVBxBqHa8",
+    "response": {
+        "clientDataJSON": {
+            "type": "webauthn.create",
+            "challenge": "oGowikAVGrvxcMnrNt89BcGlZr0UU0Ul_Jo6SDyErkM",
+            "origin": "https://webauthnworks.github.io",
+            "crossOrigin": false
+        },
+        "attestationObject": {
+            "fmt": "none",
+            "attStmt": {},
+            "authData": {
+                "rpIdHash": "zHUM-fXe8fPTc7IQdAU8xhonRmZeDznRqJqecdVRcUM"
+                "flags": { "up": true, "uv": true, "at": true, "ed": false, "flagsInt": 69 },
+                "counter": 61,
+                "counterBuffer": <Buffer 61 f3 b3 a3>,
+                "aaguid": "adce000235bcc60a648b0b25f1f05503",
+                "credID": "Aad50Szy7ZFb8f7wdfMmFO2dUdQB8StMrYBbhJprTCJIKVdbIiMs9dAATKOvUpoKfmyh662ZsO1J5PQUsi9yKNumDR-ZD4wevDYZnwprytGf5rn6ydyxQQtBYPSwS8u23FdVBxBqHa8",
+                "cosePublicKeyBuffer": Map(5) {
+                    "1" => 2,
+                    "3" => -7,
+                    "-1" => 1,
+                    "-2" => <Buffer c1 bb 63 77 ce 78 67 9c 2e 97 e7 ed 71 7f b1 5e 0e 4d ce 35 b6 c6 c4 3d 21 02 19 f0 a2 2b 8f 34>,
+                    "-3" => <Buffer 1f df aa 55 e8 66 e8 68 f6 e5 2c 99 6a ed 7b 98 1e 5c d1 8a 13 58 16 7c 9e 07 44 91 ae 04 a8 e6>
+                }
+                
+            }
+        }
+
+}
+    },
+    "getClientExtensionResults": {},
+    "type": "public-key"
+}
+```
+
 The `authenticatorAttestationResponse.response.attestationObject` includes the public key material. Next step is to send the `authenticatorAttestationResponse` created above back to the server in order to store it for future authentications. We make a POST request to 'http://localhost:3000/webauthn/register/storeCredentials', where the server gets the **PublicKeyCredential** and runs `verifyStoreCredentialsRequest` on it.
 
 Finally the server responds with a status code of true/false to flag the successful storage of the public key credential in the database
@@ -164,5 +205,33 @@ The result of the `console.log(authenticatorAssertionResponse)` should look like
 }
 ```
 Note: that is a sample response, it is not the one corresponding to the above **PublicKeyCredentialRequestOptions**.
+
+If we decode the above response we get:
+
+```json
+{
+    "id": "Aad50Szy7ZFb8f7wdfMmFO2dUdQB8StMrYBbhJprTCJIKVdbIiMs9dAATKOvUpoKfmyh662ZsO1J5PQUsi9yKNumDR-ZD4wevDYZnwprytGf5rn6ydyxQQtBYPSwS8u23FdVBxBqHa8",
+    "rawId": "Aad50Szy7ZFb8f7wdfMmFO2dUdQB8StMrYBbhJprTCJIKVdbIiMs9dAATKOvUpoKfmyh662ZsO1J5PQUsi9yKNumDR-ZD4wevDYZnwprytGf5rn6ydyxQQtBYPSwS8u23FdVBxBqHa8",
+    "response": {
+        "clientDataJSON": {
+            "type": "webauthn.get",
+            "challenge": "F5cJhLEm48Sitcz33bVnu5zA2a-FNLbLFmD_wU0OPHQ",
+            "origin": "https://webauthnworks.github.io",
+            "crossOrigin": false
+        },
+        "authenticatorData": {
+            "rpIdHash": "zHUM-fXe8fPTc7IQdAU8xhonRmZeDznRqJqecdVRcUM",
+            "flagsBuf": { "up": true, "uv": true, "at": false, "ed": false, "flagsInt": 5 },
+            "counter": 1643361194,
+            "counterBuf": <Buffer 61 f3 b3 aa>
+        },
+        "signature": "TUVVQ0lIeHpmMUtaTkpUYjgzMWdxdzBvaXQtNm1zOERvU1hMYU04enlaNFE2aXlqQWlFQXdiZ3VPWlUyaUphZV9JOC1RN3FsRndSNDVpc1otWFlWTURnVTJTa0FCVTg",
+        "userHandle": "Kosv9fPtkDoh4Oz7Yq_pVgWHS8HhdlCto5cR0aBoVMw"
+
+    },
+    "getClientExtensionResults": {},
+    "type": "public-key"
+}
+```
 
 Now, the client must send that object to the server. The server has to validate the signature using the previously stored public key, and send a successful/failed authentication attempt. In the code, the validation process is done in the webauthn route, inside `router.post('/login/verifyAssertion', (req, res) => {...})` function, that's why there is no call visible in the diagram. When the server verifies the signature, it responds with a status message to the client.

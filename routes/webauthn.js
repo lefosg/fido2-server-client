@@ -14,7 +14,7 @@ const operationTypes = {
     'create' : 'webauthn.create',
     'get' : 'webauthn.get'
 };
-const ExpectedRPIDHash = createHash('sha256').update(rpEffectiveDomain).digest('hex');;  //cut 'https://'
+const ExpectedRPIDHash = createHash('sha256').update(rpEffectiveDomain).digest('hex');  //cut 'https://'
 
 const router = Router();
 

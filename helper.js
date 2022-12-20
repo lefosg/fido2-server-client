@@ -53,7 +53,12 @@ function validateUsername(given, stored) {
 function parseGetAssertAuthData(buffer) {
     let rpIdHash      = buffer.slice(0, 32);          buffer = buffer.slice(32);
     let flagsBuf      = buffer.slice(0, 1);           buffer = buffer.slice(1);
-    let flags         = flagsBuf[0];
+    let flagsInt       = flagsBuf[0];
+    let up            = !!(flagsInt & 0x01); // Test of User Presence
+    let uv            = !!(flagsInt & 0x04); // User Verification
+    let at            = !!(flagsInt & 0x40); // Attestation data
+    let ed            = !!(flagsInt & 0x80); // Extension data
+    let flags = {up, uv, at, ed, flagsInt};
     let counterBuf    = buffer.slice(0, 4);           buffer = buffer.slice(4);
     let counter       = counterBuf.readUInt32BE(0);
 
