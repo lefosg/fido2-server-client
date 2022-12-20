@@ -150,7 +150,7 @@ async function makeCredential() {
             sendAuthenticatorAttestationResponse(newCredential);  
         }).catch(function (err) { 
             //on credential creation abandonment, update the server to clear its session variables, and for the frontend reset the state variable (see top of the file) 
-            abandonRegistration();
+            abandonWebAuthnOperationgistration();
             console.log(err)
         });
     })
@@ -158,7 +158,7 @@ async function makeCredential() {
 
 }
 
-function abandonRegistration() {
+function abandonWebAuthnOperationgistration() {
     alert("Error on registration")
     fetch('http://localhost:3000/webauthn/register/storeCredentials', {
         method: 'POST',

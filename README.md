@@ -12,9 +12,9 @@ For this implementation we use the express-js framework for the server. For the 
 
 To install and run execute the following commands:
 
-`git clone https://github.com/lefosg/fido2-server-client`
-`cd fido2-server-client`
-`npm run dev`
+- `git clone https://github.com/lefosg/fido2-server-client`
+- `cd fido2-server-client`
+- `npm run dev`
 
 The server runs on port `3000`, if this port is used change the `port` variable in `server.js` file.
 
