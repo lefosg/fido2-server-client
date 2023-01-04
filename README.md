@@ -30,6 +30,7 @@ After that we make a POST request to 'http://localhost:3000/webauthn/register/fe
 
 ```js
 //The Yubiko sample object is shows strings in Base64 form for readability
+//taken from here: https://developers.yubico.com/WebAuthn/WebAuthn_Developer_Guide/WebAuthn_Client_Registration.html
 var PublicKeyCredentialCreationOptionsYubico = {
     challenge: "qNqrdXUrk5S7dCM1MAYH3qSVDXznb-6prQoGqiACR10=",  //randomly generated, prevents replay attacks, must be signed
     rp: {  //rp info
@@ -95,8 +96,8 @@ console.log(authenticatorAttestationResponse);
 
 The result of the `console.log(authenticatorAttestationResponse)` should look like that:
 
-```json
-{
+```js
+const AuthenticatorAttestationResponse = {
     "rawId": "Aad50Szy7ZFb8f7wdfMmFO2dUdQB8StMrYBbhJprTCJIKVdbIiMs9dAATKOvUpoKfmyh662ZsO1J5PQUsi9yKNumDR-ZD4wevDYZnwprytGf5rn6ydyxQQtBYPSwS8u23FdVBxBqHa8",
     "id": "Aad50Szy7ZFb8f7wdfMmFO2dUdQB8StMrYBbhJprTCJIKVdbIiMs9dAATKOvUpoKfmyh662ZsO1J5PQUsi9yKNumDR-ZD4wevDYZnwprytGf5rn6ydyxQQtBYPSwS8u23FdVBxBqHa8",
     "response": {
@@ -111,8 +112,8 @@ Note: that is a sample response, it is not the one corresponding to the above **
 
 If decoded, it looks like this:
 
-```json
-{
+```js
+const AuthenticatorAttestationReponse_decoded = {
     "rawId": "Aad50Szy7ZFb8f7wdfMmFO2dUdQB8StMrYBbhJprTCJIKVdbIiMs9dAATKOvUpoKfmyh662ZsO1J5PQUsi9yKNumDR-ZD4wevDYZnwprytGf5rn6ydyxQQtBYPSwS8u23FdVBxBqHa8",
     "id": "Aad50Szy7ZFb8f7wdfMmFO2dUdQB8StMrYBbhJprTCJIKVdbIiMs9dAATKOvUpoKfmyh662ZsO1J5PQUsi9yKNumDR-ZD4wevDYZnwprytGf5rn6ydyxQQtBYPSwS8u23FdVBxBqHa8",
     "response": {

@@ -303,6 +303,7 @@ async function sendAuthenticatorAssertionResponse(assertionResponse) {
 
         let status = await result.json();
         console.log(status);
+        alert(status.msg);
 
     } catch (err) {
         console.log(err);

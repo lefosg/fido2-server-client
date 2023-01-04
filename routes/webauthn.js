@@ -161,11 +161,12 @@ router.post('/login/verifyAssertion', async (request, response) => {
     let signature = base64url.toBuffer(authenticatorAssertionResponse.response.signature);
     let publicKey, verified;
     try {  //to catch database related error
-        publicKey = (await User.find({username: request.session.username}))[0].publicKey;  
+        let user = (await User.find({username: request.session.username}))[0];  
+        let publicKey = user.publicKey;
         publicKey = ASN1toPEM(base64url.toBuffer(publicKey));
         verified = verifySignature(signature, signatureBase, publicKey);
         if (verified) {
-            updateCounter(request.session.username, authenticatorData.counter);
+            updateUserDB(user._id.toString(), authenticatorData.counter);;
             request.session.loggedIn = true;
             response.json({status: true, msg: "Successfully logged in"});
         } else {
@@ -409,14 +410,27 @@ function generateAssertionRequest(credentialID) {
     };
 }
 
-function updateCounter(username, counter) {
-    User.updateOne( {username: username}, 
-        {
-            $set: {
-                counter: counter
-            }
+
+/**
+ * A function that updates the user's info in database. Currently, only the counter needs to get updated
+ * @param {string} _id the userHandle
+ * @param {int} counter the signature Counter
+ */
+async function updateUserDB(_id, counter) {
+    updateCounter(_id, counter);
+}
+
+
+async function updateCounter(_id, counter) {
+    console.log(_id);
+    User.findByIdAndUpdate( _id, {"counter": counter},
+    function (err, docs) {
+        if (err){
+            console.log(err)
+        } else{
+            console.log("Updated User Counter");
         }
-    )
+    });
 }
 
 /**
